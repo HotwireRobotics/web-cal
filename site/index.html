@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotwire Robotics Schedule</title>
+  <meta name="description" content="Hotwire Robotics meeting and competition schedule. Subscribe to keep it in your calendar.">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+  <script type="module" src="assets/view.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2 4 14h6.5L9 22l11-13h-7z"/></svg></span>
+        <div>
+          <h1 id="cal-name">Hotwire Robotics</h1>
+          <p id="season">Meeting &amp; competition schedule</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="load-error" hidden class="error-box"></div>
+
+    <section class="top-grid">
+      <div class="card" id="next-up" aria-live="polite">
+        <p class="eyebrow">Next meeting</p>
+        <p class="next-big">Loading…</p>
+      </div>
+
+      <div class="card subscribe">
+        <h2>Subscribe to the calendar</h2>
+        <p class="muted">Add it once and it stays up to date on its own whenever the schedule changes.</p>
+        <div class="seg" role="tablist" aria-label="Which calendar" id="feed-tabs"></div>
+        <p class="muted small" id="feed-blurb"></p>
+        <div class="copy-row">
+          <label class="sr-only" for="feed-url">Calendar link</label>
+          <input id="feed-url" type="text" readonly>
+          <button class="btn" id="copy-feed" type="button">Copy link</button>
+        </div>
+        <div class="btn-row">
+          <a class="btn btn-primary" id="sub-apple" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            Apple Calendar / iPhone
+          </a>
+          <a class="btn" id="sub-google" href="#" target="_blank" rel="noopener">Google Calendar</a>
+          <a class="btn btn-ghost" id="sub-download" href="#" download>Download .ics</a>
+        </div>
+        <details class="help">
+          <summary>Outlook, Android, and other calendar apps</summary>
+          <ul>
+            <li><strong>Outlook:</strong> Add calendar → <em>Subscribe from web</em> (or <em>From internet</em>), then paste the link above.</li>
+            <li><strong>Android:</strong> subscribe with Google Calendar on a computer at calendar.google.com (Other calendars → + → From URL). It then syncs to your phone.</li>
+            <li><strong>Anything else:</strong> look for “subscribe”, “add by URL”, or “internet calendar” and paste the link.</li>
+            <li>Changes show up on the calendar app's own schedule: Apple and Outlook usually within an hour or two, Google Calendar can take up to a day.</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="schedule-head">
+        <h2>Schedule</h2>
+        <div id="legend"></div>
+      </div>
+      <div id="grid"><p class="muted">Loading schedule…</p></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span id="updated"></span>
+    <span aria-hidden="true"> · </span>
+    <a href="edit.html">Edit schedule</a>
+  </footer>
+  <div class="toast" id="toast" role="status"></div>
+</body>
+</html>

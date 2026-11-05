@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Schedule Editor · Hotwire Robotics</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+  <script type="module" src="assets/editor.js"></script>
+</head>
+<body>
+  <header class="site-header editor-header">
+    <div class="wrap wide">
+      <div class="brand">
+        <a class="brand-mark" href="./" title="Back to the public schedule">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9 22l11-13h-7z"/></svg>
+        </a>
+        <div>
+          <h1>Schedule editor</h1>
+          <p id="repo-label">Loading…</p>
+        </div>
+      </div>
+      <div class="toolbar">
+        <span class="save-state" id="save-state" role="status">Loading…</span>
+        <button class="btn btn-sm" id="undo-btn" type="button" title="Undo (Ctrl/⌘+Z)" disabled>Undo</button>
+        <button class="btn btn-sm" id="redo-btn" type="button" title="Redo (Ctrl/⌘+Shift+Z)" disabled>Redo</button>
+        <details class="menu" id="more-menu">
+          <summary class="btn btn-sm">More ▾</summary>
+          <div class="menu-list">
+            <button type="button" data-action="reload">Load latest from GitHub</button>
+            <button type="button" data-action="discard">Discard unpublished changes</button>
+            <hr>
+            <button type="button" data-action="download-json">Download schedule.json</button>
+            <button type="button" data-action="import-json">Import schedule.json…</button>
+            <button type="button" data-action="download-ics">Download preview .ics</button>
+            <hr>
+            <button type="button" data-action="github-editor">Publish without a token (copy &amp; paste on GitHub)</button>
+            <a href="./" target="_blank" rel="noopener">View public page ↗</a>
+          </div>
+        </details>
+        <button class="btn btn-primary" id="publish-btn" type="button" title="Publish (Ctrl/⌘+S)" disabled>Publish</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap wide editor-layout">
+    <div class="banners span-all" id="banners"></div>
+
+    <section class="card" id="days-card">
+      <div class="schedule-head">
+        <div>
+          <h2>Days</h2>
+          <p class="hint">Click a day to edit it. <kbd>Shift</kbd>-click or drag to select a range, <kbd>Ctrl</kbd>/<kbd>⌘</kbd>-click to add days, or click a weekday name to select all of them.</p>
+        </div>
+        <div id="legend"></div>
+      </div>
+      <div id="problems" class="problems" role="alert" hidden></div>
+      <div id="grid"><p class="muted">Loading schedule…</p></div>
+    </section>
+
+    <aside class="card panel is-idle" id="panel" aria-label="Edit selected days"></aside>
+
+    <section class="card span-all" id="events-card">
+      <div class="section-head">
+        <div>
+          <h2>Competitions &amp; events</h2>
+          <p class="hint">Events marked <b>Attending</b> get a red outline and appear in the calendar feeds. The rest only show on the website.</p>
+        </div>
+        <button class="btn btn-sm" type="button" data-action="add-event">+ Add event</button>
+      </div>
+      <div class="ev-list" id="events"></div>
+    </section>
+
+    <section class="card span-all" id="tags-card">
+      <div class="section-head">
+        <div>
+          <h2>No-school colors</h2>
+          <p class="hint">Color-codes days on the schedule and is listed in that day's calendar entry.</p>
+        </div>
+        <button class="btn btn-sm" type="button" data-action="add-tag">+ Add color</button>
+      </div>
+      <div class="tag-list" id="tags"></div>
+    </section>
+
+    <section class="card span-all" id="settings-card">
+      <div class="section-head"><h2>Calendar settings</h2></div>
+      <div class="settings-grid" id="settings"></div>
+    </section>
+  </main>
+
+  <dialog id="publish-dialog" aria-labelledby="publish-title">
+    <form id="publish-form">
+      <div>
+        <h2 id="publish-title">Publish changes</h2>
+        <p class="muted small">Saves <code>schedule.json</code> to GitHub. The website and calendar feeds rebuild on their own, usually within a couple of minutes.</p>
+      </div>
+      <div id="publish-changes"></div>
+      <div class="field">
+        <label class="field-label" for="p-message">Commit message</label>
+        <input id="p-message" type="text" required>
+      </div>
+      <details id="p-conn">
+        <summary class="small"><b>GitHub connection</b> · <span id="p-conn-summary"></span></summary>
+        <fieldset>
+          <div class="field">
+            <label class="field-label" for="p-repo">Repository</label>
+            <input id="p-repo" type="text" placeholder="owner/repo" spellcheck="false" autocapitalize="off">
+          </div>
+          <div class="field">
+            <label class="field-label" for="p-branch">Branch <span class="muted">(blank = default branch)</span></label>
+            <input id="p-branch" type="text" placeholder="default branch" spellcheck="false" autocapitalize="off">
+          </div>
+          <div class="field">
+            <label class="field-label" for="p-path">File</label>
+            <input id="p-path" type="text" spellcheck="false" autocapitalize="off">
+          </div>
+          <div class="field">
+            <label class="field-label" for="p-token">Access token</label>
+            <input id="p-token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+          </div>
+          <label class="check"><input type="checkbox" id="p-remember"> Remember the token on this device</label>
+          <details class="token-help">
+            <summary>How do I get a token?</summary>
+            <ol>
+              <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Settings → Fine-grained tokens → Generate new token</a>.</li>
+              <li>Resource owner: <b class="js-owner">the repository owner</b>. Repository access: <b>Only select repositories</b> → <b class="js-repo">this repository</b>.</li>
+              <li>Repository permissions → <b>Contents</b> → <b>Read and write</b>. Pick an expiration date (the end of the season works).</li>
+              <li>Generate the token, copy it, and paste it above. If the organization requires approval, an owner has to approve it first.</li>
+            </ol>
+            <p>The token stays in this browser only. Anyone who has it can edit this repository, so don't share it or save it on shared computers.</p>
+          </details>
+        </fieldset>
+      </details>
+      <p class="status-line" id="p-status" role="status"></p>
+      <div class="actions">
+        <button class="btn" type="button" id="p-cancel">Cancel</button>
+        <button class="btn btn-primary" type="submit" id="p-go">Publish</button>
+      </div>
+    </form>
+  </dialog>
+
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+  <datalist id="tz-list"></datalist>
+  <div class="toast" id="toast" role="status"></div>
+</body>
+</html>
