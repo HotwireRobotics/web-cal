@@ -3,12 +3,12 @@
   "calendar": {
     "name": "Hotwire Robotics",
     "description": "Hotwire Robotics meeting and competition schedule for the 2027 season.",
-    "url": "https://hotwirerobotics.github.io/web-cal/",
+    "url": null,
     "timezone": "America/Los_Angeles",
     "seasonStart": "2027-01-10",
     "seasonEnd": "2027-05-01",
     "meetingTitle": "Robotics Meeting",
-    "meetingLocation": "",
+    "meetingLocation": "6023 B St SE, Marion, OR 97392",
     "tbdTitle": "Robotics Meeting (time TBD)",
     "includeTbd": true
   },
@@ -31,6 +31,7 @@
     { "id": "week-9", "title": "Houston (Week 9)", "start": "2027-04-25", "end": "2027-05-02", "attending": true }
   ],
   "days": {
+    "2027-01-09": { "status": "tbd", "title": "2027 BioCore FRC Kickoff" },
     "2027-01-10": { "status": "meeting", "start": "13:00", "end": "17:00" },
     "2027-01-11": { "status": "meeting", "start": "18:00", "end": "21:00" },
     "2027-01-12": { "status": "meeting", "start": "18:00", "end": "21:00" },

@@ -447,7 +447,7 @@ export function buildIcs(raw, { feed = 'all', now = new Date() } = {}) {
   const add = (props) => lines.push('BEGIN:VEVENT', ...props.filter(Boolean), 'END:VEVENT');
   const uid = (key) => `UID:${key}${uidSuffix}@web-cal.hotwirerobotics`;
   const description = (parts) => {
-    const text = [...parts.filter(Boolean), cal.url /*&& `Full schedule: ${cal.url}`*/].filter(Boolean).join('\n\n');
+    const text = [...parts.filter(Boolean), cal.url && `Full schedule: ${cal.url}`].filter(Boolean).join('\n\n');
     return text ? `DESCRIPTION:${icsText(text)}` : null;
   };
   const url = /^https?:\/\/\S+$/.test(cal.url) ? `URL:${cal.url}` : null;
