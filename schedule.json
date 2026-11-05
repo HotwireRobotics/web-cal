@@ -3,7 +3,7 @@
   "calendar": {
     "name": "Hotwire Robotics",
     "description": "Hotwire Robotics meeting and competition schedule for the 2027 season.",
-    "url": null,
+    "url": "",
     "timezone": "America/Los_Angeles",
     "seasonStart": "2027-01-10",
     "seasonEnd": "2027-05-01",
