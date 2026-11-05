@@ -7,6 +7,8 @@
   <meta name="description" content="Hotwire Robotics meeting and competition schedule. Subscribe to keep it in your calendar.">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/style.css">
+  <!-- Libraries from package.json; scripts/build.mjs copies them into vendor/. -->
+  <script type="importmap">{ "imports": { "luxon": "./vendor/luxon.js", "ical-generator": "./vendor/ical-generator.js" } }</script>
   <script type="module" src="assets/view.js"></script>
 </head>
 <body>

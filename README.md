@@ -27,6 +27,9 @@ Open **`edit.html`** on the site (also linked as "Edit schedule" at the bottom o
 - **Days:** click a day, then set it to *Meeting* (with a time), *TBD*, *Off*, or *Blank*.
   Shift-click or drag to select a range, Ctrl/⌘-click to add days, or click a weekday name to select every one
   (handy for "all Thursdays are now 6–9 PM"). Switching TBD days to *Meeting* fills in each weekday's usual hours.
+- **Days outside the season** (kickoff, summer demos, …): pick a date under *Add a day outside the season*. It's added
+  as TBD and selected so you can set its time and title. These days appear on the site and in the calendar feeds like
+  any other day.
 - **No-school colors, title, location, notes** can be set per day. Notes show on the site and in the calendar entry.
 - **Competitions & events:** add, rename, re-date, or delete them. *Attending* events get the red outline and are
   added to the calendar feeds. The rest (e.g. Week 3) only show on the website.
@@ -86,18 +89,37 @@ within an hour or two, Google Calendar sometimes up to a day.
 }
 ```
 
-Times are 24-hour `HH:MM` in the calendar's time zone. Days can also have `title` and `location`. The editor writes
-one line per day so commit diffs stay readable. Hand edits are fine too. The build checks the file and fails with a
-clear message if something's wrong.
+Times are 24-hour `HH:MM` in the calendar's time zone. Days can also have `title` and `location`.
+
+Days don't have to fall between `seasonStart` and `seasonEnd`. Days outside the season are shown with dimmed dates,
+and long empty stretches between them and the season are collapsed into one "N weeks with nothing scheduled" row.
+
+The editor writes one line per day so commit diffs stay readable. Hand edits are fine too if they keep that layout
+(`npm test` checks it). The build checks the file and fails with a clear message if something's wrong.
 
 ## Development
 
-Plain HTML, CSS, and JavaScript, with no dependencies. Requires Node 20+.
+Plain HTML, CSS, and JavaScript with no bundler or framework. Requires Node 22+.
 
 ```bash
+npm ci           # installs the libraries below, at the exact versions in package-lock.json
 npm test         # validates schedule.json and the feed generator
 npm run serve    # builds into _site/ and serves it at http://localhost:8080
 ```
+
+### Libraries
+
+| Library | Used for |
+| --- | --- |
+| [Luxon](https://moment.github.io/luxon/) | All date, time, and time zone handling (adding days, weekdays, formatting, local time → UTC across daylight saving) |
+| [ical-generator](https://github.com/sebbo2002/ical-generator) | Writing the `.ics` feeds (escaping, line folding, all-day vs. timed events, refresh interval) |
+
+Both are pinned to exact versions in `package.json`. Node loads them from `node_modules`, and the build copies the
+same files into `_site/vendor/` for the browser (the `<script type="importmap">` in `index.html` and `edit.html`
+points at those copies), so the website and the tests always run identical code.
+
+To upgrade, run `npm install luxon@<version>` (or `ical-generator@<version>`), then `npm test` and `npm run serve`
+to check, and commit `package.json` and `package-lock.json`.
 
 | Path | Purpose |
 | --- | --- |
@@ -106,5 +128,5 @@ npm run serve    # builds into _site/ and serves it at http://localhost:8080
 | `site/assets/grid.js` | Week-by-week schedule grid |
 | `site/index.html`, `site/assets/view.js` | Public page |
 | `site/edit.html`, `site/assets/editor.js` | Editor |
-| `scripts/build.mjs` | Builds `_site/` (pages, `schedule.json`, `calendar.ics`, `competitions.ics`) |
+| `scripts/build.mjs` | Builds `_site/` (pages, libraries, `schedule.json`, `calendar.ics`, `competitions.ics`) |
 | `.github/workflows/pages.yml` | Tests, builds, and deploys to Pages on push |

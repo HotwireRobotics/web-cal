@@ -1,11 +1,15 @@
 // Shared schedule logic used by the public page, the editor, and the build script.
 // No DOM access in this file, so it runs unchanged in the browser and in Node.
+//
+// Libraries (see package.json; the build copies them into the site for the browser):
+//   Luxon          – dates, times and time zones   https://moment.github.io/luxon/
+//   ical-generator – writes the .ics feeds          https://github.com/sebbo2002/ical-generator
+import { DateTime, IANAZone, Interval } from 'luxon';
+import ical, { ICalCalendarMethod, ICalEventStatus, ICalEventTransparency } from 'ical-generator';
 
 export const STATUSES = ['meeting', 'tbd', 'off'];
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const MONTHS_SHORT = MONTHS.map((m) => m.slice(0, 3));
 
 export const DEFAULT_CALENDAR = {
   name: 'Hotwire Robotics',
@@ -21,123 +25,72 @@ export const DEFAULT_CALENDAR = {
 };
 
 /* ------------------------------------------------------------------ dates */
-// Dates are plain "YYYY-MM-DD" strings. Arithmetic happens in UTC so DST never shifts a day.
+// Calendar dates are plain "YYYY-MM-DD" strings. They are read as UTC midnight so a date never
+// shifts with the time zone of the computer running the code.
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const toUtc = (s) => {
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-};
-const fromUtc = (d) => d.toISOString().slice(0, 10);
+const calDate = (s) => DateTime.fromISO(s, { zone: 'utc', locale: 'en-US' });
 
-export function isDate(s) {
-  return typeof s === 'string' && DATE_RE.test(s) && fromUtc(toUtc(s)) === s;
-}
-export function addDays(s, n) {
-  const d = toUtc(s);
-  d.setUTCDate(d.getUTCDate() + n);
-  return fromUtc(d);
-}
-export const weekday = (s) => toUtc(s).getUTCDay();
+export const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && calDate(s).isValid;
+export const addDays = (s, n) => calDate(s).plus({ days: n }).toISODate();
+/** 0 = Sunday … 6 = Saturday (Luxon counts Monday = 1 … Sunday = 7). */
+export const weekday = (s) => calDate(s).weekday % 7;
+/** The Sunday on or before the date; the schedule's weeks run Sunday to Saturday. */
 export const startOfWeek = (s) => addDays(s, -weekday(s));
-export const daysBetween = (a, b) => Math.round((toUtc(b) - toUtc(a)) / 86400000);
+export const daysBetween = (a, b) => calDate(b).diff(calDate(a), 'days').days;
 
+/** Every date from start to end, inclusive. */
 export function datesBetween(start, end) {
-  const out = [];
-  for (let d = start; d <= end; d = addDays(d, 1)) out.push(d);
-  return out;
+  if (end < start) return [];
+  return Interval.fromDateTimes(calDate(start), calDate(end).plus({ days: 1 }))
+    .splitBy({ days: 1 })
+    .map((i) => i.start.toISODate());
 }
 
+const DATE_FORMATS = { short: 'LLL d', medium: 'ccc, LLL d', long: 'cccc, LLLL d, yyyy' };
 /** 'short' → "Jan 10", 'medium' → "Sun, Jan 10", 'long' → "Sunday, January 10, 2027" */
-export function formatDate(s, style = 'short') {
-  const d = toUtc(s);
-  const m = d.getUTCMonth();
-  const day = d.getUTCDate();
-  const wd = d.getUTCDay();
-  if (style === 'long') return `${WEEKDAYS[wd]}, ${MONTHS[m]} ${day}, ${d.getUTCFullYear()}`;
-  if (style === 'medium') return `${WEEKDAYS_SHORT[wd]}, ${MONTHS_SHORT[m]} ${day}`;
-  return `${MONTHS_SHORT[m]} ${day}`;
-}
+export const formatDate = (s, style = 'short') => calDate(s).toFormat(DATE_FORMATS[style] || DATE_FORMATS.short);
 
 /** "Mar 12 – 14", "Mar 29 – Apr 3", or "Feb 27" for single days. */
 export function formatDateRange(start, end) {
   if (!end || end === start) return formatDate(start);
-  const a = toUtc(start);
-  const b = toUtc(end);
-  if (a.getUTCMonth() === b.getUTCMonth()) return `${formatDate(start)} – ${b.getUTCDate()}`;
+  if (calDate(start).hasSame(calDate(end), 'month')) return `${formatDate(start)} – ${calDate(end).day}`;
   return `${formatDate(start)} – ${formatDate(end)}`;
 }
 
-const dtfCache = new Map();
-function partsIn(tz, date) {
-  let dtf = dtfCache.get(tz);
-  if (!dtf) {
-    dtf = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz, hourCycle: 'h23',
-      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-    });
-    dtfCache.set(tz, dtf);
-  }
-  const p = {};
-  for (const { type, value } of dtf.formatToParts(date)) p[type] = value;
-  return p;
-}
-
-export function isTimeZone(tz) {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz });
-    return typeof tz === 'string' && tz.length > 0;
-  } catch {
-    return false;
-  }
-}
+export const isTimeZone = (tz) => typeof tz === 'string' && IANAZone.isValidZone(tz);
 
 /** Today's date ("YYYY-MM-DD") and minutes past midnight in the given time zone. */
 export function nowIn(tz, now = new Date()) {
-  const p = partsIn(tz, now);
-  return { date: `${p.year}-${p.month}-${p.day}`, minutes: (Number(p.hour) % 24) * 60 + Number(p.minute) };
+  const t = DateTime.fromJSDate(now, { zone: tz });
+  return { date: t.toISODate(), minutes: t.hour * 60 + t.minute };
 }
 
-function offsetMinutes(utcMs, tz) {
-  const p = partsIn(tz, new Date(utcMs));
-  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
-  return Math.round((asUtc - utcMs) / 60000);
-}
+/** A wall-clock date + time ("18:00") in a time zone, e.g. a meeting start. */
+const wallClock = (date, time, tz) => DateTime.fromISO(`${date}T${time}`, { zone: tz });
 
-/** Converts a wall-clock date + time in `tz` to the matching UTC instant. */
-export function zonedToUtc(date, time, tz) {
-  const [y, m, d] = date.split('-').map(Number);
-  const [hh, mm] = time.split(':').map(Number);
-  const guess = Date.UTC(y, m - 1, d, hh, mm);
-  const first = offsetMinutes(guess, tz);
-  let utc = guess - first * 60000;
-  const second = offsetMinutes(utc, tz);
-  if (second !== first) utc = guess - second * 60000;
-  return new Date(utc);
-}
+/** Converts a wall-clock date + time in `tz` to the matching instant. */
+export const zonedToUtc = (date, time, tz) => wallClock(date, time, tz).toJSDate();
 
 /* ------------------------------------------------------------------ times */
+// Times are "HH:mm" strings on a 24-hour clock, e.g. "18:00".
 
-const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
-export const isTime = (t) => typeof t === 'string' && TIME_RE.test(t);
-export const toMinutes = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const clock = (t) => DateTime.fromFormat(t, 'HH:mm', { zone: 'utc', locale: 'en-US' });
 
-function clock(t) {
-  const h = Number(t.slice(0, 2));
-  const m = t.slice(3, 5);
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return { text: m === '00' ? String(h12) : `${h12}:${m}`, meridiem: h < 12 ? 'AM' : 'PM' };
-}
-export function formatTime(t) {
+export const isTime = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+export const toMinutes = (t) => {
   const c = clock(t);
-  return `${c.text} ${c.meridiem}`;
-}
+  return c.hour * 60 + c.minute;
+};
+
+const hours = (c) => c.toFormat(c.minute ? 'h:mm' : 'h'); // "6" or "6:30"
+/** "6 PM", "6:30 PM" */
+export const formatTime = (t) => `${hours(clock(t))} ${clock(t).toFormat('a')}`;
 /** "6–9 PM", "11 AM–7 PM", "7 AM–9 PM" */
 export function formatTimeRange(start, end) {
   const a = clock(start);
   const b = clock(end);
-  if (a.meridiem === b.meridiem) return `${a.text}–${b.text} ${b.meridiem}`;
-  return `${a.text} ${a.meridiem}–${b.text} ${b.meridiem}`;
+  if (a.toFormat('a') === b.toFormat('a')) return `${hours(a)}–${hours(b)} ${b.toFormat('a')}`;
+  return `${formatTime(start)}–${formatTime(end)}`;
 }
 
 /* ------------------------------------------------------------------ schedule model */
@@ -253,7 +206,16 @@ export function validateSchedule(s) {
   return errors;
 }
 
-/** First and last date the schedule grid should show. */
+/**
+ * Whether a date falls inside the season set in the calendar settings. Days outside the
+ * season (kickoff, off-season events, …) are allowed; they're just shown a little differently.
+ */
+export function inSeason(s, date) {
+  const { seasonStart, seasonEnd } = s.calendar;
+  return (!isDate(seasonStart) || date >= seasonStart) && (!isDate(seasonEnd) || date <= seasonEnd);
+}
+
+/** First and last date the schedule grid should show: the season plus any days scheduled outside it. */
 export function scheduleRange(s) {
   const dates = Object.keys(s.days).filter(isDate);
   const cal = s.calendar;
@@ -294,25 +256,36 @@ export function describeDay(s, date) {
     timeLabel,
     tags,
     attendingEvent,
+    inSeason: inSeason(s, date),
     location: entry?.location || attendingEvent?.location || (entry?.status === 'meeting' && !attendingEvent ? cal.meetingLocation : ''),
   };
 }
 
-/** Rows of 7 days (Sunday–Saturday) covering the season, with the events that start in each week. */
+/**
+ * Rows of 7 days (Sunday–Saturday) covering the season and any days scheduled outside it, with
+ * the events that start in each week. Empty weeks outside the season are left out (so one
+ * off-season date in August doesn't add a dozen blank weeks); the next row's `skippedBefore`
+ * says how many were left out.
+ */
 export function buildWeeks(s) {
   const range = scheduleRange(s);
   if (!range) return [];
   const weeks = [];
   const events = sortEvents(s.events).filter((ev) => isDate(ev.start));
+  const { seasonStart, seasonEnd } = s.calendar;
+  let skipped = 0;
   for (let start = startOfWeek(range.start); start <= range.end; start = addDays(start, 7)) {
     const end = addDays(start, 6);
-    const first = weeks.length === 0;
-    weeks.push({
-      start,
-      end,
-      dates: datesBetween(start, end),
-      events: events.filter((ev) => (ev.start >= start && ev.start <= end) || (first && ev.start < start && ev.end >= start)),
-    });
+    const dates = datesBetween(start, end);
+    const first = weeks.length === 0 && skipped === 0;
+    const weekEvents = events.filter((ev) => (ev.start >= start && ev.start <= end) || (first && ev.start < start && ev.end >= start));
+    const touchesSeason = isDate(seasonStart) && isDate(seasonEnd) ? start <= seasonEnd && end >= seasonStart : true;
+    if (!touchesSeason && !weekEvents.length && !dates.some((d) => s.days[d])) {
+      skipped += 1;
+      continue;
+    }
+    weeks.push({ start, end, dates, events: weekEvents, skippedBefore: skipped });
+    skipped = 0;
   }
   return weeks;
 }
@@ -389,32 +362,11 @@ export const FEEDS = [
   { id: 'competitions', file: 'competitions.ics', label: 'Competitions only', blurb: 'Just the events the team is attending.' },
 ];
 
-const icsText = (v) => String(v).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
-const icsDate = (d) => d.replace(/-/g, '');
-const icsUtc = (date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-
-const encoder = new TextEncoder();
-/** Folds lines longer than 75 octets (RFC 5545 §3.1) without splitting UTF-8 characters. */
-function fold(line) {
-  if (encoder.encode(line).length <= 75) return line;
-  const parts = [];
-  let current = '';
-  let bytes = 0;
-  let limit = 75;
-  for (const ch of line) {
-    const size = encoder.encode(ch).length;
-    if (bytes + size > limit) {
-      parts.push(current);
-      current = '';
-      bytes = 0;
-      limit = 74; // continuation lines start with a space
-    }
-    current += ch;
-    bytes += size;
-  }
-  parts.push(current);
-  return parts.join('\r\n ');
-}
+/**
+ * All-day entries from `start` through `end` (inclusive). In .ics files the end date is the day
+ * *after* the last day, hence the +1.
+ */
+const allDay = (start, end = start) => ({ allDay: true, start: calDate(start), end: calDate(end).plus({ days: 1 }) });
 
 /**
  * Builds an .ics feed.
@@ -426,45 +378,31 @@ export function buildIcs(raw, { feed = 'all', now = new Date() } = {}) {
   const s = normalizeSchedule(raw);
   const cal = s.calendar;
   const tz = isTimeZone(cal.timezone) ? cal.timezone : DEFAULT_CALENDAR.timezone;
-  const stamp = icsUtc(now);
   const feedInfo = FEEDS.find((f) => f.id === feed) || FEEDS[0];
-  const calName = feedInfo.id === 'all' ? cal.name : `${cal.name} – ${feedInfo.label}`;
   const uidSuffix = feedInfo.id === 'all' ? '' : `.${feedInfo.id}`;
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Hotwire Robotics//web-cal//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${icsText(calName)}`,
-    `X-WR-TIMEZONE:${tz}`,
-    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
-    'X-PUBLISHED-TTL:PT1H',
-  ];
-  const desc = cal.description || feedInfo.blurb;
-  if (desc) lines.push(`X-WR-CALDESC:${icsText(desc)}`);
+  const url = /^https?:\/\/\S+$/.test(cal.url) ? cal.url : undefined;
 
-  const add = (props) => lines.push('BEGIN:VEVENT', ...props.filter(Boolean), 'END:VEVENT');
-  const uid = (key) => `UID:${key}${uidSuffix}@web-cal.hotwirerobotics`;
-  const description = (parts) => {
-    const text = [...parts.filter(Boolean), cal.url && `Full schedule: ${cal.url}`].filter(Boolean).join('\n\n');
-    return text ? `DESCRIPTION:${icsText(text)}` : null;
-  };
-  const url = /^https?:\/\/\S+$/.test(cal.url) ? `URL:${cal.url}` : null;
+  const calendar = ical({
+    name: feedInfo.id === 'all' ? cal.name : `${cal.name} – ${feedInfo.label}`,
+    description: cal.description || feedInfo.blurb,
+    prodId: { company: 'Hotwire Robotics', product: 'web-cal' },
+    method: ICalCalendarMethod.PUBLISH,
+    ttl: 60 * 60, // ask calendar apps to check for changes every hour
+  });
+  calendar.x([{ key: 'X-WR-TIMEZONE', value: tz }]);
+
+  const add = (key, event) => calendar.createEvent({ id: `${key}${uidSuffix}@web-cal.hotwirerobotics`, stamp: now, url, ...event });
+  const description = (parts) => [...parts, cal.url && `Full schedule: ${cal.url}`].filter(Boolean).join('\n\n') || undefined;
 
   for (const ev of sortEvents(s.events)) {
     if (!ev.attending || !isDate(ev.start) || !isDate(ev.end)) continue;
-    add([
-      uid(`event-${ev.id}`),
-      `DTSTAMP:${stamp}`,
-      `DTSTART;VALUE=DATE:${icsDate(ev.start)}`,
-      `DTEND;VALUE=DATE:${icsDate(addDays(ev.end, 1))}`,
-      `SUMMARY:${icsText(ev.title)}`,
-      ev.location && `LOCATION:${icsText(ev.location)}`,
-      description([ev.notes]),
-      'TRANSP:TRANSPARENT',
-      url,
-    ]);
+    add(`event-${ev.id}`, {
+      ...allDay(ev.start, ev.end),
+      summary: ev.title,
+      location: ev.location,
+      description: description([ev.notes]),
+      transparency: ICalEventTransparency.TRANSPARENT,
+    });
   }
 
   for (const date of Object.keys(s.days)) {
@@ -472,41 +410,30 @@ export function buildIcs(raw, { feed = 'all', now = new Date() } = {}) {
     const info = describeDay(s, date);
     const entry = info.entry;
     if (feedInfo.id === 'competitions' && !info.attendingEvent) continue;
-    const details = [
-      entry.notes,
-      info.tags.length ? info.tags.map((t) => t.label).join(', ') : '',
-    ];
+    const details = [entry.notes, info.tags.map((t) => t.label).join(', ')];
     if (entry.status === 'meeting') {
       if (!isTime(entry.start) || !isTime(entry.end) || toMinutes(entry.end) <= toMinutes(entry.start)) continue;
-      add([
-        uid(`day-${date}`),
-        `DTSTAMP:${stamp}`,
-        `DTSTART:${icsUtc(zonedToUtc(date, entry.start, tz))}`,
-        `DTEND:${icsUtc(zonedToUtc(date, entry.end, tz))}`,
-        `SUMMARY:${icsText(info.title)}`,
-        info.location && `LOCATION:${icsText(info.location)}`,
-        description(details),
-        'STATUS:CONFIRMED',
-        url,
-      ]);
+      add(`day-${date}`, {
+        start: wallClock(date, entry.start, tz),
+        end: wallClock(date, entry.end, tz),
+        summary: info.title,
+        location: info.location || undefined,
+        description: description(details),
+        status: ICalEventStatus.CONFIRMED,
+      });
     } else if (entry.status === 'tbd') {
       // A competition already covers this day as an all-day event.
       if (feedInfo.id !== 'all' || !cal.includeTbd || info.attendingEvent) continue;
-      add([
-        uid(`day-${date}`),
-        `DTSTAMP:${stamp}`,
-        `DTSTART;VALUE=DATE:${icsDate(date)}`,
-        `DTEND;VALUE=DATE:${icsDate(addDays(date, 1))}`,
-        `SUMMARY:${icsText(info.title)}`,
-        entry.location && `LOCATION:${icsText(entry.location)}`,
-        description([...details, 'Meeting time has not been set yet. This entry updates automatically once it is.']),
-        'STATUS:TENTATIVE',
-        'TRANSP:TRANSPARENT',
-        url,
-      ]);
+      add(`day-${date}`, {
+        ...allDay(date),
+        summary: info.title,
+        location: entry.location,
+        description: description([...details, 'Meeting time has not been set yet. This entry updates automatically once it is.']),
+        status: ICalEventStatus.TENTATIVE,
+        transparency: ICalEventTransparency.TRANSPARENT,
+      });
     }
   }
 
-  lines.push('END:VCALENDAR');
-  return `${lines.map(fold).join('\r\n')}\r\n`;
+  return calendar.toString();
 }

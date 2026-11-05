@@ -32,10 +32,12 @@ function dayHtml(s, date, { today, selected, editable }) {
   if (today && date < today) classes.push('is-past');
   if (selected?.has(date)) classes.push('is-selected');
   if (date.endsWith('-01')) classes.push('is-month-start');
+  if (!info.inSeason) classes.push('is-outside');
 
   const bg = tagBackground(info.tags);
   const tooltip = [
     formatDate(date, 'long'),
+    info.inSeason ? '' : 'Outside the season',
     info.status ? `${info.title}${info.status === 'off' ? '' : ` · ${info.timeLabel}`}` : '',
     ...info.tags.map((t) => t.label),
     info.entry?.location ? `Location: ${info.entry.location}` : '',
@@ -83,9 +85,14 @@ export function gridHtml(s, { today = null, selected = null, editable = false } 
   ).join('');
   const rows = weeks.map((week) => {
     const cls = ['week'];
-    if (today && week.end < today) cls.push('is-past');
+    const past = today && week.end < today;
+    if (past) cls.push('is-past');
     if (today && week.start <= today && today <= week.end) cls.push('is-current');
-    return `<div class="${cls.join(' ')}" data-week="${week.start}">
+    // Empty weeks outside the season are collapsed into one short row.
+    const gap = week.skippedBefore
+      ? `<div class="week-gap${past ? ' is-past' : ''}">⋯ ${week.skippedBefore} week${week.skippedBefore === 1 ? '' : 's'} with nothing scheduled</div>`
+      : '';
+    return `${gap}<div class="${cls.join(' ')}" data-week="${week.start}">
       <div class="week-head">Week of ${formatDate(week.start)}</div>
       ${week.dates.map((d) => dayHtml(s, d, { today, selected, editable })).join('')}
       <div class="week-events">${week.events.map((ev) => eventLabelHtml(ev, editable)).join('')}</div>

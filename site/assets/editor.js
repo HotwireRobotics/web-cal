@@ -1,7 +1,7 @@
 // Schedule editor: edit days, events, colors and settings, then publish schedule.json to GitHub.
 import {
-  DEFAULT_CALENDAR, buildIcs, datesBetween, describeDay, formatDate, formatDateRange, formatTimeRange, isDate,
-  isTime, isTimeZone, normalizeSchedule, nowIn, scheduleRange, serializeSchedule, slugify, sortEvents,
+  DEFAULT_CALENDAR, buildIcs, describeDay, formatDate, formatDateRange, formatTimeRange, isDate,
+  isTime, isTimeZone, normalizeSchedule, nowIn, serializeSchedule, slugify, sortEvents,
   timePresets, toMinutes, typicalTimes, validateSchedule, weekday,
 } from './core.js';
 import { escapeHtml, gridHtml, legendHtml } from './grid.js';
@@ -612,13 +612,26 @@ function findEvent(id) {
 
 function selectEventDays(id) {
   const ev = findEvent(id);
-  const range = scheduleRange(state.schedule);
-  if (!ev || !isDate(ev.start) || !isDate(ev.end) || !range) return;
-  const start = ev.start < range.start ? range.start : ev.start;
-  const end = ev.end > range.end ? range.end : ev.end;
-  if (start > end) return toast('That event is outside the season');
-  setSelection(datesBetween(start, end), { anchor: start });
-  $(`#grid .day[data-date="${start}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (!ev || !isDate(ev.start) || !isDate(ev.end)) return;
+  const dates = visibleDates().filter((d) => d >= ev.start && d <= ev.end);
+  if (!dates.length) return toast("None of that event's days are on the schedule yet");
+  setSelection(dates, { anchor: dates[0] });
+  $(`#grid .day[data-date="${dates[0]}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+/** Adds a day anywhere on the calendar, even outside the season, and selects it for editing. */
+function addDay(date) {
+  if (!isDate(date)) return toast('Pick a date first');
+  if (state.schedule.days[date]) {
+    toast(`${formatDate(date, 'medium')} is already on the schedule`);
+  } else {
+    change((s) => {
+      s.days[date] = { status: 'tbd' };
+    }, { parts: ['grid'] });
+    toast(`Added ${formatDate(date, 'medium')} as TBD. Set its status, time and title in the edit panel.`, 4000);
+  }
+  setSelection([date], { anchor: date });
+  $(`#grid .day[data-date="${date}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 function uniqueId(base, taken) {
@@ -1026,8 +1039,15 @@ function clearSelection() {
   setSelection([], { anchor: null });
 }
 
+/** Dates shown on the grid, in order. Collapsed empty weeks outside the season aren't included. */
+function visibleDates() {
+  return $$('#grid .day[data-date]').map((el) => el.dataset.date);
+}
+
+/** The visible dates from a to b (either order), for Shift-click and drag selection. */
 function rangeDates(a, b) {
-  return a <= b ? datesBetween(a, b) : datesBetween(b, a);
+  const [start, end] = a <= b ? [a, b] : [b, a];
+  return visibleDates().filter((d) => d >= start && d <= end);
 }
 
 function wireGrid() {
@@ -1085,10 +1105,12 @@ function wireGrid() {
     }
     const dow = e.target.closest('[data-weekday]');
     if (dow) {
-      const range = scheduleRange(state.schedule);
-      if (!range) return;
       const wd = Number(dow.dataset.weekday);
-      const dates = datesBetween(range.start, range.end).filter((d) => weekday(d) === wd);
+      // Leave out blank days outside the season (e.g. the rest of kickoff week), so "every
+      // Thursday is 6–9 PM" doesn't quietly add pre-season meetings.
+      const dates = $$('#grid .day[data-date]:not(.is-outside.is-empty)')
+        .map((el) => el.dataset.date)
+        .filter((d) => weekday(d) === wd);
       setSelection(e.shiftKey || e.ctrlKey || e.metaKey ? [...state.selected, ...dates] : dates, { anchor: dates[0] });
       return;
     }
@@ -1308,6 +1330,11 @@ function wireToolbar() {
     }
   });
 }
+
+$('#add-day-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  addDay($('#add-day-date').value);
+});
 
 wireGrid();
 wirePanel();

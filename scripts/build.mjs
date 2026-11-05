@@ -1,5 +1,6 @@
 // Builds the GitHub Pages site into _site/:
 //   site/*            → _site/*            (public page + editor)
+//   libraries         → _site/vendor/*.js  (from node_modules, for the browser)
 //   schedule.json     → _site/schedule.json (byte-for-byte, so the editor can detect conflicts)
 //   generated feeds   → _site/calendar.ics, _site/competitions.ics
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -29,6 +30,14 @@ if (existsSync(out)) rmSync(out, { recursive: true });
 mkdirSync(out, { recursive: true });
 cpSync(join(root, 'site'), out, { recursive: true });
 writeFileSync(join(out, 'schedule.json'), text);
+
+// Browser copies of the libraries core.js imports. These are the same files Node loads (each
+// package's ES module entry), so the website and the tests always run the same version. The
+// import map in index.html and edit.html points "luxon" and "ical-generator" at these copies.
+mkdirSync(join(out, 'vendor'));
+for (const name of ['luxon', 'ical-generator']) {
+  cpSync(fileURLToPath(import.meta.resolve(name)), join(out, 'vendor', `${name}.js`));
+}
 
 const now = new Date();
 for (const feed of FEEDS) {

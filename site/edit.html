@@ -7,6 +7,8 @@
   <meta name="robots" content="noindex">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/style.css">
+  <!-- Libraries from package.json; scripts/build.mjs copies them into vendor/. -->
+  <script type="importmap">{ "imports": { "luxon": "./vendor/luxon.js", "ical-generator": "./vendor/ical-generator.js" } }</script>
   <script type="module" src="assets/editor.js"></script>
 </head>
 <body>
@@ -52,6 +54,11 @@
         <div>
           <h2>Days</h2>
           <p class="hint">Click a day to edit it. <kbd>Shift</kbd>-click or drag to select a range, <kbd>Ctrl</kbd>/<kbd>⌘</kbd>-click to add days, or click a weekday name to select all of them.</p>
+          <form class="add-day" id="add-day-form">
+            <label for="add-day-date">Add a day outside the season (kickoff, off-season events):</label>
+            <input type="date" id="add-day-date" required>
+            <button class="btn btn-sm" type="submit">Add day</button>
+          </form>
         </div>
         <div id="legend"></div>
       </div>

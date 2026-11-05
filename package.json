@@ -4,11 +4,15 @@
   "description": "Hotwire Robotics meeting schedule as a subscribable calendar on GitHub Pages",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
     "serve": "node scripts/build.mjs && node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "ical-generator": "11.1.2",
+    "luxon": "3.7.2"
   }
 }
