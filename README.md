@@ -4,10 +4,9 @@ The team's 2027 meeting and competition schedule (Jan 10 – May 1, 2027), publi
 
 | What | Where |
 | --- | --- |
-| Schedule page with subscribe buttons | https://hotwirerobotics.github.io/web-cal/ |
+| Schedule page (calendar + subscribe buttons) | https://hotwirerobotics.github.io/web-cal/ |
 | Full calendar feed (meetings, TBD days, competitions) | https://hotwirerobotics.github.io/web-cal/calendar.ics |
 | Competitions-only feed | https://hotwirerobotics.github.io/web-cal/competitions.ics |
-| Schedule editor | https://hotwirerobotics.github.io/web-cal/edit.html |
 
 Everything comes from one file, [`schedule.json`](schedule.json). A GitHub Action turns it into the website and
 the `.ics` feeds every time it changes, so subscribed calendars pick up edits on their next refresh.
@@ -17,49 +16,34 @@ the `.ics` feeds every time it changes, so subscribed calendars pick up edits on
 1. **Turn on Pages:** repository **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 2. **Run the deploy:** **Actions → Build and deploy calendar → Run workflow** (or push any commit).
    The first run before step 1 fails at the deploy step. That's expected; just run it again.
-3. *(Optional)* Rename the default branch to `main` under **Settings → General → Default branch**.
-   The workflow and editor follow whichever branch is the default, so nothing else needs changing.
 
-## Updating the schedule (GUI)
+## Updating the schedule
 
-Open **`edit.html`** on the site (also linked as "Edit schedule" at the bottom of the public page).
+1. Open [`schedule.json`](schedule.json) on GitHub and click the pencil icon (**Edit this file**).
+2. Make the change (see [the format](#schedulejson-format) below), then click **Commit changes**.
+3. The Action checks the file, rebuilds the site and feeds, and publishes them in about a minute.
 
-- **Days:** click a day, then set it to *Meeting* (with a time), *TBD*, *Off*, or *Blank*.
-  Shift-click or drag to select a range, Ctrl/⌘-click to add days, or click a weekday name to select every one
-  (handy for "all Thursdays are now 6–9 PM"). Switching TBD days to *Meeting* fills in each weekday's usual hours.
-- **Days outside the season** (kickoff, summer demos, …): pick a date under *Add a day outside the season*. It's added
-  as TBD and selected so you can set its time and title. These days appear on the site and in the calendar feeds like
-  any other day.
-- **No-school colors, title, location, notes** can be set per day. Notes show on the site and in the calendar entry.
-- **Competitions & events:** add, rename, re-date, or delete them. *Attending* events get the red outline and are
-  added to the calendar feeds. The rest (e.g. Week 3) only show on the website.
-- **Calendar settings:** season dates, time zone, default meeting title and location, and whether TBD days appear
-  in the feed.
-- Undo/redo (Ctrl/⌘+Z) works throughout, and edits are kept in your browser until you publish.
-
-### Publishing
-
-Press **Publish**. The editor commits `schedule.json` to the repository, and the site and feeds rebuild in about a
-minute. Publishing needs a GitHub token, entered once:
-
-1. Go to [GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token](https://github.com/settings/personal-access-tokens/new).
-2. **Resource owner:** HotwireRobotics. **Repository access:** *Only select repositories* → `web-cal`.
-3. **Repository permissions → Contents:** *Read and write*. Set an expiration (the end of the season works).
-4. Paste the token into the Publish dialog. Check *Remember the token on this device* only on your own computer.
-
-If the organization requires approval for tokens, an org owner approves it under the org's
-**Settings → Personal access tokens → Pending requests**.
-
-**No token?** Use **More → Publish without a token**. It copies the schedule and opens GitHub's file editor. Select
-everything there, paste, and click *Commit changes*. You can also download `schedule.json` and upload it on GitHub.
-
-If someone else published since you opened the editor, you'll get a warning before overwriting their changes.
+If something in the file is wrong (a typo in a date, a missing comma, a meeting that ends before it starts), the
+Action fails with a list of the problems and the live site stays as it was. GitHub notifies whoever made the
+commit; the list is under **Actions → the failed run → build → Test**. Fix the file and commit again.
 
 ## Subscribing
 
 The public page has one-click buttons for Apple Calendar (iPhone/Mac) and Google Calendar, plus a link to copy for
 Outlook and other apps. Calendar apps re-check subscriptions on their own schedule: Apple and Outlook usually
 within an hour or two, Google Calendar sometimes up to a day.
+
+## The website
+
+The schedule page shows a month calendar ([SimpleCalendarJS](https://www.simplecalendarjs.com)). It opens on the
+current month (or the first or last month of the schedule outside the season).
+
+- **Blue** – meetings, with their start time · **Amber** – meeting days whose time is still TBD
+- **Red** – competitions the team attends · **Gray** – other weeks of the season
+- **Pastel bars** – no-school days, in the colors from `schedule.json`
+
+Hovering over an entry (or tapping it on a phone) shows its times, location, and notes. Clicking a date opens that day.
+Times are shown as written in `schedule.json` (Pacific), whatever time zone the viewer's device is in.
 
 ## How the feed is built
 
@@ -89,13 +73,33 @@ within an hour or two, Google Calendar sometimes up to a day.
 }
 ```
 
-Times are 24-hour `HH:MM` in the calendar's time zone. Days can also have `title` and `location`.
+Dates are `YYYY-MM-DD`. Times are 24-hour `HH:MM` (`18:00` is 6 PM) in the calendar's time zone.
 
-Days don't have to fall between `seasonStart` and `seasonEnd`. Days outside the season are shown with dimmed dates,
-and long empty stretches between them and the season are collapsed into one "N weeks with nothing scheduled" row.
+**`days`** – one entry per date, keyed by the date:
 
-The editor writes one line per day so commit diffs stay readable. Hand edits are fine too if they keep that layout
-(`npm test` checks it). The build checks the file and fails with a clear message if something's wrong.
+| Field | |
+| --- | --- |
+| `status` | `"meeting"`, `"tbd"` (meeting, time not set yet), or `"off"` |
+| `start`, `end` | Meeting times. Required for `"meeting"` |
+| `title` | Optional. Replaces "Robotics Meeting" (e.g. `"2027 BioCore FRC Kickoff"`) |
+| `location`, `notes` | Optional. Shown on the website and in the calendar entry |
+| `tags` | Optional. No-school colors for the day, by `id` from `tags` (e.g. `["stayton", "cascade"]`) |
+
+Days can be any date, including ones before `seasonStart` or after `seasonEnd` (kickoff, summer demos, …).
+Dates that aren't listed are simply blank.
+
+**`events`** – competitions and other multi-day events. `id` must be unique and shouldn't change once people have
+subscribed (it's how calendar apps recognize the event). `end` is the last day, inclusive. `"attending": false` shows
+the event on the website only. `location` and `notes` are optional.
+
+**`tags`** – no-school colors: an `id` used in `days`, the `label` shown, and a `#rrggbb` `color`.
+
+**`calendar`** – `name`, `description`, `url` (optional link added to each calendar entry), `timezone`,
+`seasonStart`, `seasonEnd`, `meetingTitle`, `meetingLocation` (used for regular meetings), `tbdTitle`, and
+`includeTbd` (`false` leaves TBD days out of the feed).
+
+The file is JSON, so watch for commas: one between items, none after the last item in a list or `{ }`.
+Keeping one line per day (as it is now) makes changes easy to review, but any layout works.
 
 ## Development
 
@@ -109,24 +113,27 @@ npm run serve    # builds into _site/ and serves it at http://localhost:8080
 
 ### Libraries
 
-| Library | Used for |
-| --- | --- |
-| [Luxon](https://moment.github.io/luxon/) | All date, time, and time zone handling (adding days, weekdays, formatting, local time → UTC across daylight saving) |
-| [ical-generator](https://github.com/sebbo2002/ical-generator) | Writing the `.ics` feeds (escaping, line folding, all-day vs. timed events, refresh interval) |
+| Library | Used for | License |
+| --- | --- | --- |
+| [Luxon](https://moment.github.io/luxon/) | All date, time, and time zone handling | MIT |
+| [ical-generator](https://github.com/sebbo2002/ical-generator) | Writing the `.ics` feeds (escaping, line folding, all-day vs. timed events) | MIT |
+| [SimpleCalendarJS](https://www.simplecalendarjs.com) | The month calendar on the website | Free for personal, educational, and non-commercial use ([terms](https://github.com/pclslopes/SimpleCalendarJs/blob/main/LICENSE)) |
 
-Both are pinned to exact versions in `package.json`. Node loads them from `node_modules`, and the build copies the
-same files into `_site/vendor/` for the browser (the `<script type="importmap">` in `index.html` and `edit.html`
-points at those copies), so the website and the tests always run identical code.
+All three are pinned to exact versions in `package.json`. The build copies them (and their license files) into
+`_site/vendor/`, and the `<script type="importmap">` in `index.html` points the browser at those copies.
 
-To upgrade, run `npm install luxon@<version>` (or `ical-generator@<version>`), then `npm test` and `npm run serve`
-to check, and commit `package.json` and `package-lock.json`.
+To upgrade, run `npm install --save-exact luxon@<version>` (or `ical-generator@…`, `simple-calendar-js@…`), then
+`npm test` and `npm run serve` to check, and commit `package.json` and `package-lock.json`. If a library moves its
+files, the build stops with the missing path; update the list at the top of `scripts/build.mjs`.
+
+SimpleCalendarJS's README describes some options its code doesn't have (`timezone`, `changeView()`, …). The
+settings this site uses are in `renderCalendar()` in `site/assets/view.js`. Its list view is turned off because, as
+of 3.0.14, it labels each day one day early in US time zones; try it again after upgrading.
 
 | Path | Purpose |
 | --- | --- |
 | `schedule.json` | The schedule (source of truth) |
-| `site/assets/core.js` | Shared logic: data model, validation, `.ics` generation (used by the browser and the build) |
-| `site/assets/grid.js` | Week-by-week schedule grid |
-| `site/index.html`, `site/assets/view.js` | Public page |
-| `site/edit.html`, `site/assets/editor.js` | Editor |
-| `scripts/build.mjs` | Builds `_site/` (pages, libraries, `schedule.json`, `calendar.ics`, `competitions.ics`) |
+| `site/assets/core.js` | Shared logic: data model, validation, what the calendar shows, `.ics` generation |
+| `site/index.html`, `site/assets/view.js`, `site/assets/style.css` | The public page |
+| `scripts/build.mjs` | Builds `_site/` (page, libraries, `schedule.json`, `calendar.ics`, `competitions.ics`) |
 | `.github/workflows/pages.yml` | Tests, builds, and deploys to Pages on push |

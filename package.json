@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "ical-generator": "11.1.2",
-    "luxon": "3.7.2"
+    "luxon": "3.7.2",
+    "simple-calendar-js": "3.0.14"
   }
 }

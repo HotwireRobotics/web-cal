@@ -1,69 +1,38 @@
-// Public schedule page.
+// Public schedule page: subscribe links and the calendar.
+//
+// The calendar is SimpleCalendarJS (https://www.simplecalendarjs.com). Its file doesn't export
+// anything; loading it defines a global `SimpleCalendarJs`, which is what this import is for.
+import 'simple-calendar-js';
 import {
-  FEEDS, daysBetween, describeDay, formatDate, formatDateRange, isDate, isTime, normalizeSchedule, nowIn, sortEvents, toMinutes,
+  FEEDS, calendarEntries, formatDateRange, formatTimeRange, isDate, normalizeSchedule, openingDate, todayIn,
 } from './core.js';
-import { escapeHtml, gridHtml, legendHtml } from './grid.js';
 
 const $ = (sel) => document.querySelector(sel);
 
-function toast(message) {
+// Colors on the calendar. No-school days use the colors set in schedule.json.
+// (Plain "#rrggbb" values, so SimpleCalendarJS can pick black or white text to go with them.)
+const COLORS = { meeting: '#2563eb', tbd: '#9a5800', competition: '#c8232c', event: '#6b7280' };
+
+function toast(message, ms = 2200) {
   const el = $('#toast');
   el.textContent = message;
   el.classList.add('is-visible');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.classList.remove('is-visible'), 2200);
+  toast.timer = setTimeout(() => el.classList.remove('is-visible'), ms);
 }
 
-function relativeDays(n) {
-  if (n === 0) return 'today';
-  if (n === 1) return 'tomorrow';
-  return `in ${n} days`;
-}
-
-function renderNextUp(s, now) {
-  const { date: today, minutes } = nowIn(s.calendar.timezone, now);
-  const blocks = [];
-
-  // Next day the team meets (or might meet, if the time is still TBD).
-  const nextDay = Object.keys(s.days).sort().find((date) => {
-    if (date < today) return false;
-    const e = s.days[date];
-    if (e.status === 'off') return false;
-    if (date === today && e.status === 'meeting' && isTime(e.end) && toMinutes(e.end) <= minutes) return false;
-    return true;
-  });
-  if (nextDay) {
-    const info = describeDay(s, nextDay);
-    const when = info.status === 'tbd' ? 'Time TBD' : info.timeLabel;
-    const dayWord = nextDay === today ? 'Today' : formatDate(nextDay, 'long').replace(/, \d{4}$/, '');
-    blocks.push(`<div class="next-block">
-      <p class="eyebrow">Next meeting</p>
-      <p class="next-big">${escapeHtml(dayWord)}</p>
-      <p class="next-sub">${escapeHtml(when)} · ${escapeHtml(info.title)}${info.location ? ` · ${escapeHtml(info.location)}` : ''}</p>
-    </div>`);
-  } else {
-    blocks.push(`<div class="next-block"><p class="eyebrow">Next meeting</p><p class="next-big">No upcoming meetings</p>
-      <p class="next-sub">The season's schedule is complete.</p></div>`);
-  }
-
-  const comp = sortEvents(s.events).find((ev) => ev.attending && isDate(ev.start) && ev.end >= today);
-  if (comp) {
-    const ongoing = comp.start <= today;
-    blocks.push(`<div class="next-block">
-      <p class="eyebrow">${ongoing ? 'Competing now' : 'Next competition'}</p>
-      <p class="next-big" style="font-size:18px">${escapeHtml(comp.title)}</p>
-      <p class="next-sub">${escapeHtml(formatDateRange(comp.start, comp.end))}${comp.location ? ` · ${escapeHtml(comp.location)}` : ''}
-        ${ongoing ? '' : `<span class="pill">${relativeDays(daysBetween(today, comp.start))}</span>`}</p>
-    </div>`);
-  }
-  $('#next-up').innerHTML = blocks.join('');
-}
-
-function renderSubscribe(s) {
+function renderSubscribe() {
   const tabs = $('#feed-tabs');
-  tabs.innerHTML = FEEDS.map(
-    (f, i) => `<button type="button" role="tab" data-feed="${f.id}" aria-selected="${i === 0}">${escapeHtml(f.label)}</button>`,
-  ).join('');
+  tabs.replaceChildren(
+    ...FEEDS.map((feed) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('role', 'tab');
+      button.dataset.feed = feed.id;
+      button.textContent = feed.label;
+      return button;
+    }),
+  );
 
   const select = (id) => {
     const feed = FEEDS.find((f) => f.id === id) || FEEDS[0];
@@ -96,23 +65,56 @@ function renderSubscribe(s) {
   $('#feed-url').addEventListener('focus', (e) => e.target.select());
 }
 
-function renderGrid(s, today) {
-  const grid = $('#grid');
-  grid.innerHTML = gridHtml(s, { today });
-  const cal = grid.querySelector('.cal');
-  const past = grid.querySelectorAll('.week.is-past').length;
-  if (cal && past) {
-    cal.classList.add('hide-past');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-sm past-toggle';
-    btn.textContent = `Show ${past} earlier week${past === 1 ? '' : 's'}`;
-    btn.addEventListener('click', () => {
-      const hidden = cal.classList.toggle('hide-past');
-      btn.textContent = hidden ? `Show ${past} earlier week${past === 1 ? '' : 's'}` : 'Hide earlier weeks';
-    });
-    grid.prepend(btn);
-  }
+/**
+ * A Date for a schedule date + time ("18:00"). SimpleCalendarJS shows times in the viewer's own
+ * time zone, so building the Date from the schedule's wall-clock values makes a 6 PM meeting read
+ * "6 PM" for everyone, like the printed schedule. (The calendar feeds carry the real time zone.)
+ */
+function wallClock(date, time = '00:00') {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  return new Date(year, month - 1, day, hour, minute);
+}
+
+/** One entry from calendarEntries() in the shape SimpleCalendarJS expects. */
+function toCalendarEvent(entry) {
+  const timed = entry.kind === 'meeting';
+  const when = timed ? formatTimeRange(entry.startTime, entry.endTime) : formatDateRange(entry.start, entry.end);
+  return {
+    id: entry.id,
+    title: entry.title,
+    start: wallClock(entry.start, entry.startTime),
+    end: wallClock(entry.end, entry.endTime),
+    allDay: !timed,
+    color: entry.color || COLORS[entry.kind],
+    // Shown when hovering over the entry.
+    tooltip: [entry.title, when, entry.kind === 'tbd' && 'Meeting time not set yet', entry.location, entry.notes].filter(Boolean).join('\n'),
+  };
+}
+
+function renderCalendar(s, today) {
+  const el = $('#calendar');
+  el.replaceChildren();
+  const events = calendarEntries(s).map(toCalendarEvent);
+  // On narrow screens there's no room for "6 PM" next to each title, so meetings become bars.
+  const narrow = window.matchMedia('(max-width: 640px)').matches;
+
+  new window.SimpleCalendarJs(el, {
+    defaultView: 'month',
+    // Clicking a date (or "+N more") opens that day. No 'list' view: in SimpleCalendarJS 3.0.14 it
+    // labels each day one day early in US time zones. Check again after upgrading.
+    enabledViews: ['month', 'day'],
+    defaultDate: wallClock(openingDate(s, today)),
+    locale: 'en-US',
+    monthTimedEventStyle: narrow ? 'block' : 'list',
+    autoContrastText: true,
+    // Titles and notes are shown as plain text.
+    allowHtmlInEvents: false,
+    tooltipAllowHtml: false,
+    fetchEvents: async () => events,
+    // Hover shows the details on a computer; phones can't hover, so tapping shows them too.
+    onEventClick: (event) => toast(event.tooltip, 6000),
+  });
 }
 
 async function main() {
@@ -125,23 +127,19 @@ async function main() {
     const box = $('#load-error');
     box.hidden = false;
     box.textContent = `Couldn't load the schedule (${err.message}). Try refreshing the page.`;
-    $('#grid').innerHTML = '';
+    $('#calendar').replaceChildren();
     return;
   }
 
   const cal = s.calendar;
-  const now = new Date();
-  const today = nowIn(cal.timezone, now).date;
   document.title = `${cal.name} Schedule`;
   $('#cal-name').textContent = cal.name;
   if (isDate(cal.seasonStart)) {
     $('#season').textContent = `${cal.seasonStart.slice(0, 4)} season · ${formatDateRange(cal.seasonStart, cal.seasonEnd || cal.seasonStart)}`;
   }
 
-  renderNextUp(s, now);
-  renderSubscribe(s);
-  $('#legend').innerHTML = legendHtml(s);
-  renderGrid(s, today);
+  renderSubscribe();
+  renderCalendar(s, todayIn(cal.timezone));
 
   try {
     const info = await (await fetch('build-info.json', { cache: 'no-cache' })).json();

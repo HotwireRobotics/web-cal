@@ -1,15 +1,13 @@
-// Shared schedule logic used by the public page, the editor, and the build script.
+// Shared schedule logic used by the public page and the build script.
 // No DOM access in this file, so it runs unchanged in the browser and in Node.
 //
 // Libraries (see package.json; the build copies them into the site for the browser):
 //   Luxon          – dates, times and time zones   https://moment.github.io/luxon/
 //   ical-generator – writes the .ics feeds          https://github.com/sebbo2002/ical-generator
-import { DateTime, IANAZone, Interval } from 'luxon';
+import { DateTime, IANAZone } from 'luxon';
 import ical, { ICalCalendarMethod, ICalEventStatus, ICalEventTransparency } from 'ical-generator';
 
 export const STATUSES = ['meeting', 'tbd', 'off'];
-export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const DEFAULT_CALENDAR = {
   name: 'Hotwire Robotics',
@@ -32,22 +30,10 @@ const calDate = (s) => DateTime.fromISO(s, { zone: 'utc', locale: 'en-US' });
 
 export const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && calDate(s).isValid;
 export const addDays = (s, n) => calDate(s).plus({ days: n }).toISODate();
-/** 0 = Sunday … 6 = Saturday (Luxon counts Monday = 1 … Sunday = 7). */
-export const weekday = (s) => calDate(s).weekday % 7;
-/** The Sunday on or before the date; the schedule's weeks run Sunday to Saturday. */
-export const startOfWeek = (s) => addDays(s, -weekday(s));
 export const daysBetween = (a, b) => calDate(b).diff(calDate(a), 'days').days;
 
-/** Every date from start to end, inclusive. */
-export function datesBetween(start, end) {
-  if (end < start) return [];
-  return Interval.fromDateTimes(calDate(start), calDate(end).plus({ days: 1 }))
-    .splitBy({ days: 1 })
-    .map((i) => i.start.toISODate());
-}
-
-const DATE_FORMATS = { short: 'LLL d', medium: 'ccc, LLL d', long: 'cccc, LLLL d, yyyy' };
-/** 'short' → "Jan 10", 'medium' → "Sun, Jan 10", 'long' → "Sunday, January 10, 2027" */
+const DATE_FORMATS = { short: 'LLL d', medium: 'ccc, LLL d' };
+/** 'short' → "Jan 10", 'medium' → "Sun, Jan 10" */
 export const formatDate = (s, style = 'short') => calDate(s).toFormat(DATE_FORMATS[style] || DATE_FORMATS.short);
 
 /** "Mar 12 – 14", "Mar 29 – Apr 3", or "Feb 27" for single days. */
@@ -59,17 +45,11 @@ export function formatDateRange(start, end) {
 
 export const isTimeZone = (tz) => typeof tz === 'string' && IANAZone.isValidZone(tz);
 
-/** Today's date ("YYYY-MM-DD") and minutes past midnight in the given time zone. */
-export function nowIn(tz, now = new Date()) {
-  const t = DateTime.fromJSDate(now, { zone: tz });
-  return { date: t.toISODate(), minutes: t.hour * 60 + t.minute };
-}
+/** Today's date ("YYYY-MM-DD") in the given time zone. */
+export const todayIn = (tz, now = new Date()) => DateTime.fromJSDate(now, { zone: tz }).toISODate();
 
 /** A wall-clock date + time ("18:00") in a time zone, e.g. a meeting start. */
 const wallClock = (date, time, tz) => DateTime.fromISO(`${date}T${time}`, { zone: tz });
-
-/** Converts a wall-clock date + time in `tz` to the matching instant. */
-export const zonedToUtc = (date, time, tz) => wallClock(date, time, tz).toJSDate();
 
 /* ------------------------------------------------------------------ times */
 // Times are "HH:mm" strings on a 24-hour clock, e.g. "18:00".
@@ -97,7 +77,7 @@ export function formatTimeRange(start, end) {
 
 const str = (v) => (v == null ? '' : String(v)).trim();
 
-export function slugify(text) {
+function slugify(text) {
   return str(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
 }
 
@@ -206,25 +186,6 @@ export function validateSchedule(s) {
   return errors;
 }
 
-/**
- * Whether a date falls inside the season set in the calendar settings. Days outside the
- * season (kickoff, off-season events, …) are allowed; they're just shown a little differently.
- */
-export function inSeason(s, date) {
-  const { seasonStart, seasonEnd } = s.calendar;
-  return (!isDate(seasonStart) || date >= seasonStart) && (!isDate(seasonEnd) || date <= seasonEnd);
-}
-
-/** First and last date the schedule grid should show: the season plus any days scheduled outside it. */
-export function scheduleRange(s) {
-  const dates = Object.keys(s.days).filter(isDate);
-  const cal = s.calendar;
-  const candidatesStart = [cal.seasonStart, dates[0]].filter(isDate).sort();
-  const candidatesEnd = [cal.seasonEnd, dates[dates.length - 1]].filter(isDate).sort();
-  if (!candidatesStart.length) return null;
-  return { start: candidatesStart[0], end: candidatesEnd[candidatesEnd.length - 1] };
-}
-
 export const eventsCovering = (s, date) => s.events.filter((ev) => isDate(ev.start) && ev.start <= date && date <= ev.end);
 export const attendingEventOn = (s, date) => sortEvents(eventsCovering(s, date)).find((ev) => ev.attending) || null;
 
@@ -235,124 +196,76 @@ export function describeDay(s, date) {
   const cal = s.calendar;
   const tags = (entry?.tags || []).map((id) => s.tags.find((t) => t.id === id)).filter(Boolean);
   let title = '';
-  let timeLabel = '';
-  if (entry) {
-    if (entry.status === 'meeting') {
-      title = entry.title || attendingEvent?.title || cal.meetingTitle;
-      timeLabel = isTime(entry.start) && isTime(entry.end) ? formatTimeRange(entry.start, entry.end) : 'Time?';
-    } else if (entry.status === 'tbd') {
-      title = entry.title || attendingEvent?.title || cal.tbdTitle;
-      timeLabel = 'TBD';
-    } else {
-      title = entry.title || 'No meeting';
-      timeLabel = 'Off';
-    }
-  }
+  if (entry?.status === 'meeting') title = entry.title || attendingEvent?.title || cal.meetingTitle;
+  else if (entry?.status === 'tbd') title = entry.title || attendingEvent?.title || cal.tbdTitle;
+  else if (entry) title = entry.title || 'No meeting';
   return {
     date,
     entry,
     status: entry?.status || null,
     title,
-    timeLabel,
     tags,
     attendingEvent,
-    inSeason: inSeason(s, date),
     location: entry?.location || attendingEvent?.location || (entry?.status === 'meeting' && !attendingEvent ? cal.meetingLocation : ''),
   };
 }
 
+/* ------------------------------------------------------------------ website calendar */
+
 /**
- * Rows of 7 days (Sunday–Saturday) covering the season and any days scheduled outside it, with
- * the events that start in each week. Empty weeks outside the season are left out (so one
- * off-season date in August doesn't add a dozen blank weeks); the next row's `skippedBefore`
- * says how many were left out.
+ * Everything the website's calendar shows, as plain data (dates and times are the schedule's own
+ * wall-clock values). `kind` is one of:
+ *   'meeting'     – a timed meeting (start/end times set)
+ *   'tbd'         – a meeting day without a time yet (left out on competition days, like the feed)
+ *   'competition' – an event the team is attending
+ *   'event'       – an event the team isn't attending (e.g. other weeks of the season)
+ *   'tag'         – a no-school color, joined across back-to-back days ("No School All Three", Mar 22–26)
+ * Days off are left out, the same as in the calendar feed.
  */
-export function buildWeeks(s) {
-  const range = scheduleRange(s);
-  if (!range) return [];
-  const weeks = [];
-  const events = sortEvents(s.events).filter((ev) => isDate(ev.start));
-  const { seasonStart, seasonEnd } = s.calendar;
-  let skipped = 0;
-  for (let start = startOfWeek(range.start); start <= range.end; start = addDays(start, 7)) {
-    const end = addDays(start, 6);
-    const dates = datesBetween(start, end);
-    const first = weeks.length === 0 && skipped === 0;
-    const weekEvents = events.filter((ev) => (ev.start >= start && ev.start <= end) || (first && ev.start < start && ev.end >= start));
-    const touchesSeason = isDate(seasonStart) && isDate(seasonEnd) ? start <= seasonEnd && end >= seasonStart : true;
-    if (!touchesSeason && !weekEvents.length && !dates.some((d) => s.days[d])) {
-      skipped += 1;
-      continue;
+export function calendarEntries(s) {
+  const entries = [];
+  for (const ev of sortEvents(s.events)) {
+    if (!isDate(ev.start) || !isDate(ev.end)) continue;
+    entries.push({
+      id: `event-${ev.id}`, kind: ev.attending ? 'competition' : 'event', title: ev.title,
+      start: ev.start, end: ev.end, location: ev.location || '', notes: ev.notes || '',
+    });
+  }
+  const tagRuns = new Map(); // tag id → its latest entry, so back-to-back days can be joined
+  for (const date of Object.keys(s.days).filter(isDate)) {
+    const info = describeDay(s, date);
+    const { entry } = info;
+    const day = { start: date, end: date, title: info.title, location: info.location || '', notes: entry.notes || '' };
+    if (entry.status === 'meeting' && isTime(entry.start) && isTime(entry.end)) {
+      entries.push({ ...day, id: date, kind: 'meeting', startTime: entry.start, endTime: entry.end });
+    } else if (entry.status === 'tbd' && !info.attendingEvent) {
+      entries.push({ ...day, id: date, kind: 'tbd' });
     }
-    weeks.push({ start, end, dates, events: weekEvents, skippedBefore: skipped });
-    skipped = 0;
+    for (const tag of info.tags) {
+      const run = tagRuns.get(tag.id);
+      if (run && addDays(run.end, 1) === date) run.end = date;
+      else {
+        const next = { id: `${date}-${tag.id}`, kind: 'tag', title: tag.label, color: tag.color, start: date, end: date, location: '', notes: '' };
+        tagRuns.set(tag.id, next);
+        entries.push(next);
+      }
+    }
   }
-  return weeks;
+  return entries;
 }
 
-/** The most common meeting time per weekday, used as defaults when turning a day into a meeting. */
-export function typicalTimes(s) {
-  const counts = Array.from({ length: 7 }, () => new Map());
-  for (const [date, day] of Object.entries(s.days)) {
-    if (day.status !== 'meeting' || !isTime(day.start) || !isTime(day.end) || !isDate(date)) continue;
-    if (attendingEventOn(s, date)) continue; // competition hours aren't typical
-    const key = `${day.start}-${day.end}`;
-    const m = counts[weekday(date)];
-    m.set(key, (m.get(key) || 0) + 1);
-  }
-  return counts.map((m) => {
-    const best = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
-    if (!best) return null;
-    const [start, end] = best[0].split('-');
-    return { start, end };
-  });
+/** First and last date the schedule covers (season dates, days and events), or null if it's empty. */
+export function scheduleSpan(s) {
+  const { seasonStart, seasonEnd } = s.calendar;
+  const dates = [seasonStart, seasonEnd, ...Object.keys(s.days), ...s.events.flatMap((ev) => [ev.start, ev.end])].filter(isDate).sort();
+  return dates.length ? { first: dates[0], last: dates.at(-1) } : null;
 }
 
-/** Distinct meeting times, most used first. */
-export function timePresets(s, limit = 6) {
-  const m = new Map();
-  for (const day of Object.values(s.days)) {
-    if (day.status !== 'meeting' || !isTime(day.start) || !isTime(day.end)) continue;
-    const key = `${day.start}-${day.end}`;
-    m.set(key, (m.get(key) || 0) + 1);
-  }
-  if (!m.size) m.set('18:00-21:00', 1);
-  return [...m.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([key]) => {
-      const [start, end] = key.split('-');
-      return { start, end, label: formatTimeRange(start, end) };
-    })
-    .sort((a, b) => toMinutes(a.start) - toMinutes(b.start) || toMinutes(a.end) - toMinutes(b.end));
-}
-
-/* ------------------------------------------------------------------ JSON file format */
-
-const DAY_KEYS = ['status', 'start', 'end', 'title', 'location', 'notes', 'tags'];
-const EVENT_KEYS = ['id', 'title', 'start', 'end', 'attending', 'location', 'notes'];
-const inline = (obj, keys) =>
-  `{ ${keys.filter((k) => obj[k] !== undefined).map((k) => `${JSON.stringify(k)}: ${JSON.stringify(obj[k])}`).join(', ')} }`;
-
-/**
- * Pretty-prints a schedule with one line per day and per event, so commits made by the
- * editor produce small, readable diffs.
- */
-export function serializeSchedule(raw) {
-  const s = normalizeSchedule(raw);
-  const list = (items, keys) =>
-    items.length ? `[\n${items.map((i) => `    ${inline(i, keys)}`).join(',\n')}\n  ]` : '[]';
-  const days = Object.entries(s.days).map(([date, day]) => `    ${JSON.stringify(date)}: ${inline(day, DAY_KEYS)}`);
-  return [
-    '{',
-    '  "version": 1,',
-    `  "calendar": ${JSON.stringify(s.calendar, null, 2).replace(/\n/g, '\n  ')},`,
-    `  "tags": ${list(s.tags, ['id', 'label', 'color'])},`,
-    `  "events": ${list(sortEvents(s.events), EVENT_KEYS)},`,
-    `  "days": ${days.length ? `{\n${days.join(',\n')}\n  }` : '{}'}`,
-    '}',
-    '',
-  ].join('\n');
+/** The date the website's calendar opens on: today, kept within the schedule's first and last dates. */
+export function openingDate(s, today) {
+  const span = scheduleSpan(s);
+  if (!span || (today >= span.first && today <= span.last)) return today;
+  return today < span.first ? span.first : span.last;
 }
 
 /* ------------------------------------------------------------------ iCalendar (.ics) */

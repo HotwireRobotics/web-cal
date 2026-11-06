@@ -1,7 +1,7 @@
 // Builds the GitHub Pages site into _site/:
-//   site/*            → _site/*            (public page + editor)
-//   libraries         → _site/vendor/*.js  (from node_modules, for the browser)
-//   schedule.json     → _site/schedule.json (byte-for-byte, so the editor can detect conflicts)
+//   site/*            → _site/*            (the public page)
+//   libraries         → _site/vendor/*     (from node_modules, for the browser)
+//   schedule.json     → _site/schedule.json
 //   generated feeds   → _site/calendar.ics, _site/competitions.ics
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -31,12 +31,21 @@ mkdirSync(out, { recursive: true });
 cpSync(join(root, 'site'), out, { recursive: true });
 writeFileSync(join(out, 'schedule.json'), text);
 
-// Browser copies of the libraries core.js imports. These are the same files Node loads (each
-// package's ES module entry), so the website and the tests always run the same version. The
-// import map in index.html and edit.html points "luxon" and "ical-generator" at these copies.
-mkdirSync(join(out, 'vendor'));
-for (const name of ['luxon', 'ical-generator']) {
-  cpSync(fileURLToPath(import.meta.resolve(name)), join(out, 'vendor', `${name}.js`));
+// Browser copies of the libraries, with their licenses. The import map in index.html points at
+// these files. Paths on the left are inside node_modules/<library>/.
+const VENDOR = {
+  luxon: { 'build/es6/luxon.mjs': 'luxon.js', 'LICENSE.md': 'luxon-LICENSE.md' },
+  'ical-generator': { 'dist/index.mjs': 'ical-generator.js', LICENSE: 'ical-generator-LICENSE.txt' },
+  'simple-calendar-js': {
+    'dist/simple-calendar-js.min.js': 'simple-calendar-js.js',
+    'dist/simple-calendar-js.min.css': 'simple-calendar-js.css',
+    LICENSE: 'simple-calendar-js-LICENSE.txt',
+  },
+};
+for (const [library, files] of Object.entries(VENDOR)) {
+  for (const [from, to] of Object.entries(files)) {
+    cpSync(join(root, 'node_modules', library, from), join(out, 'vendor', to));
+  }
 }
 
 const now = new Date();

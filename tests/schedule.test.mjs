@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import {
-  addDays, buildIcs, buildWeeks, datesBetween, describeDay, formatDate, formatDateRange, formatTimeRange, isDate,
-  normalizeSchedule, serializeSchedule, startOfWeek, validateSchedule, weekday, zonedToUtc,
+  addDays, buildIcs, calendarEntries, daysBetween, describeDay, formatDate, formatDateRange, formatTimeRange, isDate,
+  normalizeSchedule, openingDate, todayIn, validateSchedule,
 } from '../site/assets/core.js';
 
 const raw = JSON.parse(readFileSync(new URL('../schedule.json', import.meta.url), 'utf8'));
@@ -22,28 +22,8 @@ const events = (ics) => ics.split('BEGIN:VEVENT').slice(1).map((block) => {
 });
 
 test('schedule.json is valid', () => {
-  assert.deepEqual(validateSchedule(schedule), []);
-});
-
-test('schedule.json is stored in the canonical format the editor writes', () => {
-  assert.equal(readFileSync(new URL('../schedule.json', import.meta.url), 'utf8'), serializeSchedule(raw));
-});
-
-test('serialize → parse round-trips', () => {
-  assert.deepEqual(normalizeSchedule(JSON.parse(serializeSchedule(schedule))), schedule);
-});
-
-test('weeks run Sunday to Saturday and cover the season plus any days scheduled outside it', () => {
-  const weeks = buildWeeks(schedule);
-  const shown = weeks.flatMap((w) => w.dates);
-  for (const w of weeks) {
-    assert.equal(weekday(w.start), 0, `${w.start} should be a Sunday`);
-    assert.deepEqual(w.dates, datesBetween(w.start, addDays(w.start, 6)));
-  }
-  for (const date of Object.keys(schedule.days)) assert.ok(shown.includes(date), `${date} should be on the grid`);
-  assert.ok(shown.includes(schedule.calendar.seasonStart), 'season start is on the grid');
-  assert.ok(shown.includes(schedule.calendar.seasonEnd), 'season end is on the grid');
-  assert.equal(new Set(shown).size, shown.length, 'no date appears twice');
+  const errors = validateSchedule(schedule);
+  assert.ok(!errors.length, `schedule.json has ${errors.length} problem(s):\n  - ${errors.join('\n  - ')}`);
 });
 
 test('days before and after the season are supported', () => {
@@ -57,17 +37,12 @@ test('days before and after the season are supported', () => {
     },
   });
   assert.deepEqual(validateSchedule(s), []);
-  assert.equal(describeDay(s, '2027-01-09').inSeason, false);
-  assert.equal(describeDay(s, '2027-01-10').inSeason, true);
-  assert.equal(describeDay(s, '2027-08-14').inSeason, false);
 
-  const weeks = buildWeeks(s);
-  assert.equal(weeks[0].start, '2027-01-03', 'grid starts the Sunday before kickoff');
-  assert.equal(weeks[0].skippedBefore, 0);
-  // The empty weeks from May 2 through Aug 7 are collapsed instead of shown as blank rows.
-  assert.equal(weeks.at(-1).start, '2027-08-08');
-  assert.equal(weeks.at(-1).skippedBefore, 14);
-  assert.equal(weeks.at(-2).end, '2027-05-01');
+  const shown = calendarEntries(s);
+  assert.ok(shown.some((e) => e.id === '2027-01-09' && e.kind === 'tbd' && e.title === 'Kickoff'));
+  assert.ok(shown.some((e) => e.id === '2027-08-14' && e.kind === 'meeting' && e.startTime === '10:00'));
+  assert.equal(openingDate(s, '2027-07-01'), '2027-07-01', 'the website can open on a summer month');
+  assert.equal(openingDate(s, '2027-09-01'), '2027-08-14');
 
   const list = events(buildIcs(s, { now: NOW }));
   const kickoff = list.find((e) => e.UID.startsWith('day-2027-01-09@'));
@@ -79,14 +54,11 @@ test('days before and after the season are supported', () => {
 
 test('date helpers', () => {
   assert.equal(addDays('2027-02-27', 2), '2027-03-01');
-  assert.equal(weekday('2027-01-10'), 0);
-  assert.equal(weekday('2027-01-09'), 6);
-  assert.equal(startOfWeek('2027-01-09'), '2027-01-03');
-  assert.deepEqual(datesBetween('2027-02-27', '2027-03-01'), ['2027-02-27', '2027-02-28', '2027-03-01']);
+  assert.equal(daysBetween('2027-02-27', '2027-03-01'), 2);
   assert.equal(isDate('2027-02-30'), false);
   assert.equal(isDate('2027-2-3'), false);
-  assert.equal(formatDate('2027-01-09', 'long'), 'Saturday, January 9, 2027');
   assert.equal(formatDate('2027-01-09', 'medium'), 'Sat, Jan 9');
+  assert.equal(todayIn('America/Los_Angeles', new Date('2027-01-10T07:00:00Z')), '2027-01-09'); // still Saturday night in Oregon
   assert.equal(formatDateRange('2027-03-12', '2027-03-14'), 'Mar 12 – 14');
   assert.equal(formatDateRange('2027-03-29', '2027-04-03'), 'Mar 29 – Apr 3');
 });
@@ -107,12 +79,13 @@ test('feeds come out the same whatever time zone the computer is in', () => {
   }
 });
 
-test('converts local meeting times to UTC across the DST change', () => {
-  // 6 PM PST on Jan 11 2027
-  assert.equal(zonedToUtc('2027-01-11', '18:00', 'America/Los_Angeles').toISOString(), '2027-01-12T02:00:00.000Z');
-  // DST starts 2 AM Mar 14 2027: 7 AM that morning is already PDT
-  assert.equal(zonedToUtc('2027-03-14', '07:00', 'America/Los_Angeles').toISOString(), '2027-03-14T14:00:00.000Z');
-  assert.equal(zonedToUtc('2027-03-13', '21:00', 'America/Los_Angeles').toISOString(), '2027-03-14T05:00:00.000Z');
+test('meeting times stay right across the daylight saving change', () => {
+  // Daylight saving time starts at 2 AM on Mar 14 2027, in the middle of Wilsonville (Week 2).
+  const list = events(buildIcs(schedule, { now: NOW }));
+  const day = (date) => list.find((e) => e.UID.startsWith(`day-${date}@`));
+  assert.equal(day('2027-03-13').DTSTART, '20270313T150000Z'); // 7 AM PST
+  assert.equal(day('2027-03-13').DTEND, '20270314T050000Z'); // 9 PM PST
+  assert.equal(day('2027-03-14').DTSTART, '20270314T140000Z'); // 7 AM PDT
 });
 
 test('formats time ranges like the paper schedule', () => {
@@ -181,6 +154,40 @@ test('ics output follows RFC 5545 line rules', () => {
   const ev = events(ics).find((e) => e.UID.startsWith('day-2027-01-11@'));
   assert.equal(ev.SUMMARY, 'Build\\, test\\; ship \\\\ repeat');
   assert.match(ev.DESCRIPTION, /^Line one\\nLine two é+/);
+});
+
+test('website calendar shows meetings, TBD days, no-school days and all events', () => {
+  const shown = calendarEntries(schedule);
+  const byId = (id) => shown.find((e) => e.id === id);
+  assert.equal(new Set(shown.map((e) => e.id)).size, shown.length, 'ids are unique');
+
+  assert.deepEqual(byId('2027-01-11'), {
+    id: '2027-01-11', kind: 'meeting', title: 'Robotics Meeting', start: '2027-01-11', end: '2027-01-11',
+    startTime: '18:00', endTime: '21:00', location: schedule.calendar.meetingLocation, notes: '',
+  });
+  assert.equal(byId('2027-03-12').title, 'Wilsonville (Week 2)', 'competition days take the competition name');
+  assert.equal(byId('2027-01-14'), undefined, 'days off are left out');
+  assert.equal(byId('2027-01-09').kind, 'tbd');
+  for (const e of shown.filter((x) => x.kind === 'tbd')) {
+    assert.equal(describeDay(schedule, e.start).attendingEvent, null, `${e.start}: TBD days inside a competition are left out`);
+  }
+
+  assert.equal(byId('event-week-2').kind, 'competition');
+  assert.equal(byId('event-week-3').kind, 'event', 'events the team skips still show, in gray');
+  assert.equal(shown.filter((e) => e.kind === 'competition' || e.kind === 'event').length, schedule.events.length);
+
+  // Back-to-back no-school days are one bar, not one per day.
+  const springBreak = byId('2027-03-22-all');
+  assert.equal(springBreak.title, 'No School All Three');
+  assert.equal(springBreak.end, '2027-03-26');
+  assert.equal(springBreak.color, '#b8d9a6');
+  assert.equal(shown.filter((e) => e.title === 'No School All Three' && e.start >= '2027-03-22' && e.start <= '2027-03-26').length, 1);
+});
+
+test('website calendar opens on today, or the nearest end of the schedule', () => {
+  assert.equal(openingDate(schedule, '2026-11-05'), '2027-01-09', 'before the season: kickoff month');
+  assert.equal(openingDate(schedule, '2027-03-10'), '2027-03-10');
+  assert.equal(openingDate(schedule, '2027-06-20'), '2027-05-02', 'after the season: last month (Houston ends May 2)');
 });
 
 test('validation catches common mistakes', () => {
