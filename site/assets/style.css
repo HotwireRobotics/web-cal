@@ -1,47 +1,35 @@
-/* Hotwire Robotics schedule — styles for the public page. */
+/* Hotwire Robotics schedule — styles for the public page.
+   Colors and fonts follow the team website, https://www.hotwirerobotics.com/ */
+
+/* Fonts: Barlow (headings and text) and Play (navigation and buttons), from the @fontsource
+   packages in package.json. scripts/build.mjs copies the files into vendor/fonts/. */
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 400; font-display: swap; src: url('../vendor/fonts/barlow-400.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 600; font-display: swap; src: url('../vendor/fonts/barlow-600.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 700; font-display: swap; src: url('../vendor/fonts/barlow-700.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: italic; font-weight: 700; font-display: swap; src: url('../vendor/fonts/barlow-700-italic.woff2') format('woff2'); }
+@font-face { font-family: 'Play'; font-style: normal; font-weight: 700; font-display: swap; src: url('../vendor/fonts/play-700.woff2') format('woff2'); }
 
 :root {
-  color-scheme: light dark;
-  --bg: #f3f4f6;
-  --surface: #ffffff;
-  --surface-2: #f8f9fb;
-  --border: #e0e4ea;
-  --border-strong: #c6cdd6;
-  --text: #15181c;
-  --text-muted: #5b6471;
-  --text-faint: #8a93a0;
-  --accent: #d2361f;
-  --accent-strong: #b02713;
-  --accent-soft: #fdebe7;
-  --on-accent: #ffffff;
-  --select: #2563eb;
-  --warn-bg: #fff6e0;
-  --warn-border: #f1d28b;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.07);
+  color-scheme: dark;
+  --black: #000000;          /* header */
+  --bg: #212121;             /* page */
+  --surface: #2d2d2d;        /* cards */
+  --surface-2: #3a3a3a;      /* buttons, tabs, hover */
+  --border: #444444;
+  --border-strong: #575757;
+  --text: #ffffff;           /* headings */
+  --text-body: #e8e8e8;
+  --text-muted: #ababab;
+  --text-faint: #818181;
+  --accent: #ff7927;         /* the team's orange */
+  --accent-strong: #ff9757;
+  --accent-soft: rgba(255, 121, 39, 0.16);
+  --warn-bg: #2b2412;
+  --warn-border: #5c4b1f;
   --radius: 12px;
   --radius-sm: 8px;
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1115;
-    --surface: #161a20;
-    --surface-2: #1b2028;
-    --border: #2a313b;
-    --border-strong: #3b4450;
-    --text: #e8ebef;
-    --text-muted: #a2abb7;
-    --text-faint: #6e7886;
-    --accent: #ff5b3d;
-    --accent-strong: #ff7a62;
-    --accent-soft: rgba(255, 91, 61, 0.14);
-    --on-accent: #1a0904;
-    --select: #6ea2ff;
-    --warn-bg: #2b2412;
-    --warn-border: #5c4b1f;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  }
+  --font: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-display: 'Play', 'Barlow', system-ui, sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -49,132 +37,147 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--text);
-  font: 15px/1.45 var(--font);
+  color: var(--text-body);
+  font: 16px/1.45 var(--font);
 }
 a { color: var(--accent); }
 a:hover { color: var(--accent-strong); }
-h1, h2, h3 { line-height: 1.2; margin: 0; }
-h2 { font-size: 17px; font-weight: 650; }
+h1, h2, h3 { color: var(--text); line-height: 1.1; margin: 0; }
+h2 { font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; }
 p { margin: 0; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 .muted { color: var(--text-muted); }
-.small { font-size: 13px; }
+.small { font-size: 14px; }
 
 .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
 
 /* ---------------------------------------------------------------- header */
-.site-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
+.site-header { background: var(--black); }
 .site-header .wrap {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  min-height: 68px; padding-top: 10px; padding-bottom: 10px; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px 24px;
+  min-height: 76px; padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap;
 }
-.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.brand-mark {
-  width: 40px; height: 40px; border-radius: 10px; flex: none;
-  display: grid; place-items: center;
-  background: var(--accent); color: var(--on-accent);
+.brand { display: block; flex: none; }
+.brand img { display: block; height: 48px; width: auto; }
+.site-nav { display: flex; flex-wrap: wrap; gap: 6px 24px; }
+.site-nav a {
+  font: italic 700 16px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: 0.02em;
+  color: var(--text); text-decoration: none;
 }
-.brand-mark svg { width: 22px; height: 22px; }
-.brand h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
-.brand p { color: var(--text-muted); font-size: 13px; }
+.site-nav a:hover, .site-nav a[aria-current='page'] { color: var(--accent); }
 
-main { padding-top: 20px; padding-bottom: 40px; display: grid; gap: 16px; }
+main.wrap { padding-top: 36px; padding-bottom: 40px; display: grid; gap: 20px; }
+
+.page-title h1 {
+  font-size: clamp(36px, 7vw, 56px); font-style: italic; font-weight: 700; text-transform: uppercase;
+}
+.page-title .accent { color: var(--accent); }
+.page-title p { margin-top: 8px; font-size: 18px; }
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 18px;
+  padding: 20px;
   min-width: 0;
 }
-.card > h2 + p, .card > h2 + .muted { margin-top: 4px; }
+.card > h2 + p { margin-top: 6px; }
 
 footer.site-footer {
-  color: var(--text-faint); font-size: 13px;
+  color: var(--text-faint); font-size: 14px;
   padding: 0 16px 32px; text-align: center;
 }
 
 /* ---------------------------------------------------------------- buttons & inputs */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 36px; padding: 0 14px;
-  border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
-  background: var(--surface); color: var(--text);
-  font: inherit; font-size: 14px; font-weight: 550; text-decoration: none;
-  cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; padding: 0 16px;
+  border-radius: var(--radius-sm); border: 0;
+  background: var(--surface-2); color: var(--text);
+  font: 700 15px/1.15 var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; text-decoration: none;
+  text-align: center; cursor: pointer;
 }
-.btn:hover { background: var(--surface-2); color: var(--text); }
+.btn:hover { background: var(--border-strong); color: var(--text); }
 .btn svg { width: 16px; height: 16px; flex: none; }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
-.btn-ghost { border-color: transparent; background: transparent; }
-.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
-:focus-visible { outline: 2px solid var(--select); outline-offset: 2px; }
+.btn-primary { background: var(--accent); }
+.btn-primary:hover { background: var(--accent-strong); }
+.btn-ghost { background: transparent; color: var(--accent); }
+.btn-ghost:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 input[type='text'] {
-  font: inherit; font-size: 14px; color: var(--text);
-  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  padding: 7px 10px; min-height: 36px; width: 100%; min-width: 0;
+  font: inherit; font-size: 15px; color: var(--text-body);
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0;
 }
 
-.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--bg); border-radius: 10px; flex-wrap: wrap; }
 .seg button {
-  font: inherit; font-size: 13px; font-weight: 600; color: var(--text-muted);
-  border: 0; background: transparent; border-radius: 7px; padding: 6px 12px; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--text-muted);
+  border: 0; background: transparent; border-radius: 7px; padding: 6px 14px; cursor: pointer;
 }
 .seg button:hover { color: var(--text); }
-.seg button[aria-selected='true'] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg button[aria-selected='true'] { background: var(--surface-2); color: var(--text); }
 
 /* ---------------------------------------------------------------- subscribe */
-.subscribe .seg { margin: 14px 0 8px; }
-.copy-row { display: flex; gap: 8px; margin: 10px 0 12px; }
-.copy-row input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
-details.help { margin-top: 12px; font-size: 14px; color: var(--text-muted); }
-details.help summary { cursor: pointer; color: var(--text); font-weight: 550; }
+.subscribe .seg { margin: 16px 0 8px; }
+.copy-row { display: flex; gap: 8px; margin: 10px 0 14px; }
+.copy-row input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+details.help { margin-top: 14px; font-size: 15px; color: var(--text-muted); }
+details.help summary { cursor: pointer; color: var(--text-body); font-weight: 600; }
 details.help ul { margin: 8px 0 0; padding-left: 20px; }
 details.help li + li { margin-top: 4px; }
+details.help strong { color: var(--text-body); }
 .error-box { border: 1px solid var(--warn-border); background: var(--warn-bg); padding: 12px 14px; border-radius: var(--radius-sm); }
 
 /* ---------------------------------------------------------------- toast */
 .toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(20px); z-index: 50;
-  background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 550;
+  background: var(--text); color: var(--black); padding: 10px 16px; border-radius: 12px; font-size: 15px; font-weight: 600;
   white-space: pre-line; text-align: center;
   opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; max-width: calc(100vw - 32px);
 }
 .toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ---------------------------------------------------------------- calendar (SimpleCalendarJS) */
-/* SimpleCalendarJS reads these variables. Pointing them at the site's colors makes it match the
-   rest of the page, including dark mode. */
+/* SimpleCalendarJS reads these variables. Pointing them at the colors above makes it match the
+   rest of the page. */
 :root {
   --cal-bg: var(--surface);
-  --cal-bg-secondary: var(--surface-2);
-  --cal-text: var(--text);
+  --cal-bg-secondary: var(--bg);
+  --cal-text: var(--text-body);
   --cal-text-subtle: var(--text-muted);
   --cal-text-muted: var(--text-faint);
   --cal-border: var(--border);
   --cal-border-strong: var(--border-strong);
   --cal-hover: var(--surface-2);
-  --cal-hover-strong: var(--border);
+  --cal-hover-strong: var(--border-strong);
   --cal-primary: var(--accent);
   --cal-primary-dark: var(--accent-strong);
   --cal-primary-light: var(--accent-soft);
   --cal-today-bg: var(--accent-soft);
-  --cal-today-text: var(--accent-strong);
+  --cal-today-text: var(--accent);
   --cal-selected-bg: var(--accent-soft);
+  --cal-tooltip-bg: var(--black);
+  --cal-tooltip-text: var(--text);
+  --cal-tooltip-border: var(--border-strong);
   --cal-font-family: var(--font);
+  --cal-font-size: 14px;
   --cal-loading-bg: transparent;
 }
-#calendar { height: 760px; }
+/* The month name ("March 2027") in the team website's heading style. These are SimpleCalendarJS
+   class names; if an upgrade renames them, the title just goes back to the library's look. */
+.uc-calendar .uc-title, .uc-calendar .uc-year-btn {
+  font-size: 20px; font-style: italic; font-weight: 700; text-transform: uppercase; color: var(--text);
+}
+.uc-calendar .uc-year-btn { color: var(--accent); }
+#calendar { height: 780px; }
 @media (max-width: 640px) {
-  #calendar { height: 75vh; min-height: 480px; }
+  .calendar-card { padding: 8px 4px; }
+  #calendar { height: 720px; }
+  /* Phones: meeting bars only have room for the time ("6 PM"); tap one for the details. */
+  .uc-calendar .uc-event-time + .uc-event-title { display: none; }
 }

@@ -31,9 +31,18 @@ mkdirSync(out, { recursive: true });
 cpSync(join(root, 'site'), out, { recursive: true });
 writeFileSync(join(out, 'schedule.json'), text);
 
-// Browser copies of the libraries, with their licenses. The import map in index.html points at
-// these files. Paths on the left are inside node_modules/<library>/.
+// Browser copies of the libraries and fonts, with their licenses. The import map in index.html
+// and the @font-face rules in style.css point at these files. Paths on the left are inside
+// node_modules/<package>/.
 const VENDOR = {
+  '@fontsource/barlow': {
+    'files/barlow-latin-400-normal.woff2': 'fonts/barlow-400.woff2',
+    'files/barlow-latin-600-normal.woff2': 'fonts/barlow-600.woff2',
+    'files/barlow-latin-700-normal.woff2': 'fonts/barlow-700.woff2',
+    'files/barlow-latin-700-italic.woff2': 'fonts/barlow-700-italic.woff2',
+    LICENSE: 'fonts/barlow-LICENSE.txt',
+  },
+  '@fontsource/play': { 'files/play-latin-700-normal.woff2': 'fonts/play-700.woff2', LICENSE: 'fonts/play-LICENSE.txt' },
   luxon: { 'build/es6/luxon.mjs': 'luxon.js', 'LICENSE.md': 'luxon-LICENSE.md' },
   'ical-generator': { 'dist/index.mjs': 'ical-generator.js', LICENSE: 'ical-generator-LICENSE.txt' },
   'simple-calendar-js': {

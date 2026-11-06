@@ -9,9 +9,10 @@ import {
 
 const $ = (sel) => document.querySelector(sel);
 
-// Colors on the calendar. No-school days use the colors set in schedule.json.
-// (Plain "#rrggbb" values, so SimpleCalendarJS can pick black or white text to go with them.)
-const COLORS = { meeting: '#2563eb', tbd: '#9a5800', competition: '#c8232c', event: '#6b7280' };
+// Colors on the calendar, from the team logo's flame (orange, yellow, red). No-school days use
+// the colors set in schedule.json. Plain "#rrggbb" values, so SimpleCalendarJS can pick black or
+// white text to go with each one.
+const COLORS = { meeting: '#ff7927', tbd: '#ffcb05', competition: '#ed1c24', event: '#575757' };
 
 function toast(message, ms = 2200) {
   const el = $('#toast');
@@ -107,6 +108,7 @@ function renderCalendar(s, today) {
     defaultDate: wallClock(openingDate(s, today)),
     locale: 'en-US',
     monthTimedEventStyle: narrow ? 'block' : 'list',
+    showBorder: false, // the card around it is the border
     autoContrastText: true,
     // Titles and notes are shown as plain text.
     allowHtmlInEvents: false,
@@ -133,9 +135,10 @@ async function main() {
 
   const cal = s.calendar;
   document.title = `${cal.name} Schedule`;
-  $('#cal-name').textContent = cal.name;
   if (isDate(cal.seasonStart)) {
-    $('#season').textContent = `${cal.seasonStart.slice(0, 4)} season · ${formatDateRange(cal.seasonStart, cal.seasonEnd || cal.seasonStart)}`;
+    const end = isDate(cal.seasonEnd) ? cal.seasonEnd : cal.seasonStart;
+    $('#season-label').textContent = `${cal.seasonStart.slice(0, 4)} season`;
+    $('#season-dates').textContent = `Meetings and competitions · ${formatDateRange(cal.seasonStart, end)}, ${end.slice(0, 4)}`;
   }
 
   renderSubscribe();

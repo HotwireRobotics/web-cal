@@ -38,12 +38,17 @@ within an hour or two, Google Calendar sometimes up to a day.
 The schedule page shows a month calendar ([SimpleCalendarJS](https://www.simplecalendarjs.com)). It opens on the
 current month (or the first or last month of the schedule outside the season).
 
-- **Blue** – meetings, with their start time · **Amber** – meeting days whose time is still TBD
+- **Orange** – meetings, with their start time · **Yellow** – meeting days whose time is still TBD
 - **Red** – competitions the team attends · **Gray** – other weeks of the season
 - **Pastel bars** – no-school days, in the colors from `schedule.json`
 
 Hovering over an entry (or tapping it on a phone) shows its times, location, and notes. Clicking a date opens that day.
 Times are shown as written in `schedule.json` (Pacific), whatever time zone the viewer's device is in.
+
+The page follows the look of the [team website](https://www.hotwirerobotics.com/): black header with the logo, dark
+background, the team orange (`#ff7927`), and the Barlow and Play fonts. The colors are at the top of
+`site/assets/style.css`; the logo and icon are `site/assets/logo.png` and `site/assets/icon.png`, taken from the team
+website.
 
 ## How the feed is built
 
@@ -118,13 +123,16 @@ npm run serve    # builds into _site/ and serves it at http://localhost:8080
 | [Luxon](https://moment.github.io/luxon/) | All date, time, and time zone handling | MIT |
 | [ical-generator](https://github.com/sebbo2002/ical-generator) | Writing the `.ics` feeds (escaping, line folding, all-day vs. timed events) | MIT |
 | [SimpleCalendarJS](https://www.simplecalendarjs.com) | The month calendar on the website | Free for personal, educational, and non-commercial use ([terms](https://github.com/pclslopes/SimpleCalendarJs/blob/main/LICENSE)) |
+| [Barlow](https://fontsource.org/fonts/barlow) and [Play](https://fontsource.org/fonts/play) fonts (Fontsource) | Headings and text; navigation and buttons | SIL Open Font License |
 
-All three are pinned to exact versions in `package.json`. The build copies them (and their license files) into
-`_site/vendor/`, and the `<script type="importmap">` in `index.html` points the browser at those copies.
+All are pinned to exact versions in `package.json`. The build copies the files the site uses (and their licenses)
+into `_site/vendor/`. The `<script type="importmap">` in `index.html` and the `@font-face` rules in `style.css` point
+the browser at those copies, so the page loads nothing from other sites.
 
-To upgrade, run `npm install --save-exact luxon@<version>` (or `ical-generator@…`, `simple-calendar-js@…`), then
-`npm test` and `npm run serve` to check, and commit `package.json` and `package-lock.json`. If a library moves its
-files, the build stops with the missing path; update the list at the top of `scripts/build.mjs`.
+To upgrade, run `npm install --save-exact luxon@<version>` (or `ical-generator@…`, `simple-calendar-js@…`,
+`@fontsource/barlow@…`), then `npm test` and `npm run serve` to check, and commit `package.json` and
+`package-lock.json`. If a package moves its files, the build stops with the missing path; update the list at the top
+of `scripts/build.mjs`.
 
 SimpleCalendarJS's README describes some options its code doesn't have (`timezone`, `changeView()`, …). The
 settings this site uses are in `renderCalendar()` in `site/assets/view.js`. Its list view is turned off because, as
@@ -135,5 +143,6 @@ of 3.0.14, it labels each day one day early in US time zones; try it again after
 | `schedule.json` | The schedule (source of truth) |
 | `site/assets/core.js` | Shared logic: data model, validation, what the calendar shows, `.ics` generation |
 | `site/index.html`, `site/assets/view.js`, `site/assets/style.css` | The public page |
+| `site/assets/logo.png`, `site/assets/icon.png` | Team logo (header) and flame icon (browser tab, home screen) |
 | `scripts/build.mjs` | Builds `_site/` (page, libraries, `schedule.json`, `calendar.ics`, `competitions.ics`) |
 | `.github/workflows/pages.yml` | Tests, builds, and deploys to Pages on push |

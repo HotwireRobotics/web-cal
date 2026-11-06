@@ -12,6 +12,8 @@
     "serve": "node scripts/build.mjs && node scripts/serve.mjs"
   },
   "dependencies": {
+    "@fontsource/barlow": "5.3.0",
+    "@fontsource/play": "5.3.0",
     "ical-generator": "11.1.2",
     "luxon": "3.7.2",
     "simple-calendar-js": "3.0.14"

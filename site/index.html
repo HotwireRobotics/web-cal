@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hotwire Robotics Schedule</title>
   <meta name="description" content="Hotwire Robotics meeting and competition schedule. Subscribe to keep it in your calendar.">
-  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="assets/icon.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="assets/icon.png">
   <link rel="stylesheet" href="vendor/simple-calendar-js.css">
   <link rel="stylesheet" href="assets/style.css">
   <!-- Libraries from package.json; scripts/build.mjs copies them into vendor/. -->
@@ -23,17 +25,22 @@
 <body>
   <header class="site-header">
     <div class="wrap">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2 4 14h6.5L9 22l11-13h-7z"/></svg></span>
-        <div>
-          <h1 id="cal-name">Hotwire Robotics</h1>
-          <p id="season">Meeting &amp; competition schedule</p>
-        </div>
-      </div>
+      <a class="brand" href="https://www.hotwirerobotics.com/">
+        <img src="assets/logo.png" alt="Hotwire Robotics" width="211" height="48">
+      </a>
+      <nav class="site-nav" aria-label="Hotwire Robotics">
+        <a href="https://www.hotwirerobotics.com/">Team website</a>
+        <a href="./" aria-current="page">Schedule</a>
+      </nav>
     </div>
   </header>
 
   <main class="wrap">
+    <div class="page-title">
+      <h1><span id="season-label">Team</span> <span class="accent">Schedule</span></h1>
+      <p id="season-dates">Meetings and competitions</p>
+    </div>
+
     <div id="load-error" hidden class="error-box"></div>
 
     <section class="card subscribe">
@@ -65,7 +72,7 @@
       </details>
     </section>
 
-    <section class="card" aria-labelledby="schedule-title">
+    <section class="card calendar-card" aria-labelledby="schedule-title">
       <h2 class="sr-only" id="schedule-title">Schedule</h2>
       <div id="calendar"><p class="muted">Loading schedule…</p></div>
     </section>
